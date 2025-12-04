@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profiling</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="flex h-screen">
+        {% include 'sidebar.html' %}
+        <main class="flex-1 p-8 overflow-y-auto">
+            <h2 class="text-2xl font-bold mb-6">Company Profiling</h2>
+
+            <div>
+                <div class="border-b border-gray-200 mb-4">
+                    <nav class="flex space-x-4" aria-label="Tabs">
+                        <button class="tab-btn px-3 py-2 text-sm font-medium bg-white rounded-t border border-b-0" data-tab="details">Company Details</button>
+                        <button class="tab-btn px-3 py-2 text-sm font-medium bg-white rounded-t border border-b-0" data-tab="preferences">Preferences</button>
+                        <button class="tab-btn px-3 py-2 text-sm font-medium bg-white rounded-t border border-b-0" data-tab="capabilities">Capabilities</button>
+                        <button class="tab-btn px-3 py-2 text-sm font-medium bg-white rounded-t border border-b-0" data-tab="performance">Past Performance</button>
+                        <button class="tab-btn px-3 py-2 text-sm font-medium bg-white rounded-t border border-b-0" data-tab="knowledge">Knowledge</button>
+                    </nav>
+                </div>
+
+                <!-- Tabs Content -->
+                <section id="tab-details" class="tab-pane hidden">
+                    <h3 class="text-lg font-semibold mb-4">Company Details</h3>
+                    <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="hidden" name="action" value="save_details" />
+                        <input class="border rounded px-3 py-2" name="name" placeholder="Company Name" value="{{ (details.name if details else '') }}" />
+                        <input class="border rounded px-3 py-2" name="website" placeholder="Website" value="{{ (details.website if details else '') }}" />
+                        <input class="border rounded px-3 py-2" name="email" placeholder="Email" value="{{ (details.email if details else '') }}" />
+                        <input class="border rounded px-3 py-2" name="phone" placeholder="Phone" value="{{ (details.phone if details else '') }}" />
+                        <textarea class="border rounded px-3 py-2 md:col-span-2" name="about" placeholder="About">{{ (details.about if details else '') }}</textarea>
+                        <div class="md:col-span-2">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                        </div>
+                    </form>
+                    <div class="mt-6 bg-white p-6 rounded-lg shadow">
+                        <h4 class="font-semibold mb-3">Current Company Profile</h4>
+                        {% if details %}
+                        <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                            <div>
+                                <dt class="text-gray-500">Company Name</dt>
+                                <dd class="text-gray-900">{{ details.name }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-gray-500">Website</dt>
+                                <dd class="text-gray-900">{{ details.website }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-gray-500">Email</dt>
+                                <dd class="text-gray-900">{{ details.email }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-gray-500">Phone</dt>
+                                <dd class="text-gray-900">{{ details.phone }}</dd>
+                            </div>
+                            <div class="md:col-span-2">
+                                <dt class="text-gray-500">About</dt>
+                                <dd class="text-gray-900 whitespace-pre-line">{{ details.about }}</dd>
+                            </div>
+                        </dl>
+                        {% else %}
+                        <p class="text-gray-500 text-sm">No company details saved yet.</p>
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section id="tab-preferences" class="tab-pane hidden">
+                    <h3 class="text-lg font-semibold mb-4">Preferences</h3>
+                    <form method="POST" class="grid grid-cols-1 gap-4">
+                        <input type="hidden" name="action" value="save_preferences" />
+                        <label class="text-sm text-gray-600">Registered State Licensing</label>
+                        <textarea class="border rounded px-3 py-2" name="registered_states" placeholder="e.g., CA, NY, TX">{{ (preferences.registered_states if preferences else '') }}</textarea>
+                        <div>
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section id="tab-capabilities" class="tab-pane hidden">
+                    <h3 class="text-lg font-semibold mb-4">Capabilities</h3>
+                    <form method="POST" enctype="multipart/form-data" class="grid grid-cols-1 gap-4">
+                        <input type="hidden" name="action" value="add_capability" />
+                        <label class="text-sm text-gray-600">Description</label>
+                        <textarea class="border rounded px-3 py-2" name="cap_description" placeholder="Describe capability"></textarea>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Upload attachment (optional)</label>
+                            <input type="file" name="cap_file" class="border rounded px-3 py-2 w-full" />
+                        </div>
+                        <div>
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded">Add</button>
+                        </div>
+                    </form>
+                    <div class="mt-6">
+                        <h4 class="font-semibold mb-2">Existing Capabilities</h4>
+                        <ul class="list-disc ml-6 text-sm">
+                            {% for c in capabilities %}
+                            <li>{{ c.description }}{% if c.file_path %} - <a class="text-blue-600 underline" href="/uploads/{{ c.file_path }}" target="_blank">attachment</a>{% endif %}</li>
+                            {% endfor %}
+                            {% if capabilities|length == 0 %}<li class="text-gray-500">None yet</li>{% endif %}
+                        </ul>
+                    </div>
+                </section>
+
+                <section id="tab-bidrules" class="tab-pane hidden">
+                    <h3 class="text-lg font-semibold mb-4">Bid / No Bid</h3>
+                    <form class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input class="border rounded px-3 py-2" name="obstacle" placeholder="Obstacle" />
+                        <input class="border rounded px-3 py-2" name="ideal" placeholder="Ideal" />
+                        <div class="md:col-span-2">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded">Save Rules</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section id="tab-performance" class="tab-pane hidden">
+                    <h3 class="text-lg font-semibold mb-4">Past Performance</h3>
+                    <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="hidden" name="action" value="add_performance" />
+                        <input class="border rounded px-3 py-2" name="project_name" placeholder="Project Name" />
+                        <input class="border rounded px-3 py-2" type="date" name="project_year" placeholder="Year" />
+                        <div class="md:col-span-2">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded">Add</button>
+                        </div>
+                    </form>
+                    <div class="mt-6">
+                        <h4 class="font-semibold mb-2">Recorded Performances</h4>
+                        <ul class="list-disc ml-6 text-sm">
+                            {% for p in performances %}
+                            <li>{{ p.project_name }}{% if p.year %} ({{ p.year }}){% endif %}</li>
+                            {% endfor %}
+                            {% if performances|length == 0 %}<li class="text-gray-500">None yet</li>{% endif %}
+                        </ul>
+                    </div>
+                </section>
+
+                
+
+                <section id="tab-knowledge" class="tab-pane hidden">
+                    <h3 class="text-lg font-semibold mb-4">Knowledge Hub</h3>
+                    {% if message %}<div class="text-green-700 mb-3">{{ message }}</div>{% endif %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h4 class="font-semibold mb-3">Documents</h4>
+                            <form method="POST" enctype="multipart/form-data" class="space-y-3">
+                                <input type="hidden" name="action" value="upload_docs" />
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Target Folder (optional)</label>
+                                    <select name="target_folder" class="border rounded px-3 py-2 w-full">
+                                        <option value="">/</option>
+                                        {% for f in folders %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <input type="file" name="documents" multiple class="border rounded px-3 py-2 w-full" />
+                                <button class="px-4 py-2 bg-blue-600 text-white rounded"><i class="fas fa-upload mr-2"></i>Upload</button>
+                            </form>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h4 class="font-semibold mb-3">Create New Folder</h4>
+                            <form method="POST" class="space-y-3">
+                                <input type="hidden" name="action" value="create_folder" />
+                                <input type="text" name="folder_name" placeholder="Folder name" class="border rounded px-3 py-2 w-full" />
+                                <button class="px-4 py-2 bg-green-600 text-white rounded"><i class="fas fa-folder-plus mr-2"></i>Create</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h4 class="font-semibold mb-4">Existing Folders</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {% for f in folders %}
+                            <div class="border rounded p-3"><i class="fas fa-folder text-yellow-500 mr-2"></i>{{ f }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const tabs = ['details','preferences','capabilities','performance','knowledge'];
+        const btns = document.querySelectorAll('.tab-btn');
+        function showTab(name){
+            tabs.forEach(t=>{
+                const pane=document.getElementById('tab-'+t);
+                if(pane){ pane.classList.toggle('hidden', t!==name); }
+            })
+            btns.forEach(b=>b.classList.toggle('bg-gray-100', b.dataset.tab===name));
+        }
+        btns.forEach(b=>b.addEventListener('click', ()=>showTab(b.dataset.tab)));
+        showTab('knowledge');
+    </script>
+</body>
+</html>
+
+

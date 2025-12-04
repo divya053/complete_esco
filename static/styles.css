@@ -1,0 +1,26 @@
+/* Custom scrollbar for a better aesthetic with the light theme */
+/* Works on Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #a0aec0 #edf2f7; /* thumb and track color */
+}
+
+/* Works on Chrome, Edge, and Safari */
+*::-webkit-scrollbar {
+  width: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #edf2f7; /* light grey track */
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #a0aec0; /* medium grey thumb */
+  border-radius: 20px;
+  border: 3px solid #edf2f7; /* track color border */
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+

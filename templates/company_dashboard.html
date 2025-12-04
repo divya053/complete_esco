@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ company.name }} Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .pulse-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(0.8);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.2);
+                opacity: 0;
+            }
+        }
+        
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
+        .timeline-checkpoint { transition: transform 0.2s ease-in-out; z-index: 10; }
+        .timeline-checkpoint:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        {% include 'sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="flex-1 p-8 overflow-y-auto">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">{{ company.name }} Dashboard</h2>
+                <p class="text-gray-600">Company-specific projects and timeline tracking</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Active Projects</p>
+                        <p class="text-3xl font-bold text-gray-900">{{ company_metrics.active_projects }}</p>
+                    </div>
+                    <i class="fas fa-project-diagram text-4xl text-blue-500"></i>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Total Tasks</p>
+                        <p class="text-3xl font-bold text-gray-900">{{ company_metrics.total_tasks }}</p>
+                    </div>
+                    <i class="fas fa-tasks text-4xl text-green-500"></i>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Completed Projects</p>
+                        <p class="text-3xl font-bold text-gray-900">{{ company_metrics.completed_projects }}</p>
+                    </div>
+                    <i class="fas fa-check-circle text-4xl text-yellow-500"></i>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Avg Progress</p>
+                        <p class="text-3xl font-bold text-gray-900">{{ company_metrics.avg_progress_pct }}%</p>
+                    </div>
+                    <i class="fas fa-chart-pie text-4xl text-purple-500"></i>
+                </div>
+            </div>
+
+            <!-- Bid Analyzer Mini Graphs -->
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Visualization</h3>
+                    <span class="text-xs text-gray-500">Company-specific metrics</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm text-gray-600">Decisions</p>
+                            <button class="text-gray-400 hover:text-gray-700" title="Expand" data-expand="decision">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                        <canvas id="companyDecisionBar" height="100"></canvas>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm text-gray-600">Pipeline (Submitted vs Remaining)</p>
+                            <button class="text-gray-400 hover:text-gray-700" title="Expand" data-expand="pipeline">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                        <canvas id="companyPipelineStack" height="100"></canvas>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm text-gray-600">Timeline Scatter (Due Days vs Progress)</p>
+                            <button class="text-gray-400 hover:text-gray-700" title="Expand" data-expand="scatter">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                        <canvas id="companyScatter" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BID Timeline -->
+            <div class="bg-gray-50 p-8 rounded-xl shadow-lg mb-10">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2">BID Timeline</h2>
+                    <p class="text-gray-600">{{ company.name }} - Top 5 High Priority BIDs</p>
+                </div>
+
+                <div class="space-y-10">
+                {% for item in go_projects %}
+                <!-- Timeline Tracker {{ loop.index }} -->
+                <div class="bg-white p-8 rounded-lg shadow-md overflow-hidden" data-bid-card="{{ item.g_id }}" data-stage-map='{{ (item.stage_progress_map|default({}))|tojson|safe }}'>
+                    <div class="flex justify-between items-center mb-12">
+                        <h3 class="text-xl font-semibold text-gray-900">{{ item.b_name }}</h3>
+                        <div class="flex items-center space-x-4">
+                            <span class="px-3 py-1 bg-blue-100 text-blue-600 text-sm font-semibold rounded-full">{{ item.company }}</span>
+                            <button class="timeline-summary-toggle flex items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
+                                <span>Dropdown for Summary</span>
+                                <i class="fas fa-chevron-down ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="relative w-full pr-4">
+                        <div class="absolute top-4 left-0 w-full h-1 bg-gray-200"></div>
+                        <div class="timeline-segments pointer-events-none">
+                            {% set seg_count = (item.stages|length - 1) if (item.stages|length - 1) > 0 else 0 %}
+                            {% if seg_count > 0 %}
+                                {% for i in range(seg_count) %}
+                                    {% set seg_stage = item.stages[i] %}
+                                    {% set map = item.stage_progress_map or {} %}
+                                    {% set sp = map.get(seg_stage, 0) %}
+                                    {% set leftpct = (100 * i / seg_count) %}
+                                    {% set widthpct = (sp / seg_count) %}
+                                    <div class="segment-progress absolute top-4 h-1 bg-green-500" data-stage="{{ seg_stage }}" style="left: {{ leftpct }}%; width: {{ widthpct }}%; z-index: 1;"></div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <div class="timeline-dot hidden absolute top-4 left-0 h-8 w-8 -translate-x-1/2 -translate-y-1/2" style="left: 0%; z-index: 20;">
+                            <div class="relative w-full h-full flex items-center justify-center">
+                                <div class="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
+                            </div>
+                        </div>
+                        <div class="relative flex justify-between">
+                            {% for st in item.stages %}
+                            {% set index = loop.index0 %}
+                            {% set pct = (100 * index // (item.stages|length - 1)) if (item.stages|length - 1) > 0 else 0 %}
+                            <div class="timeline-checkpoint text-center cursor-pointer" data-stage="{{ st }}" data-projectId="{{ item.g_id }}">
+                                <div class="checkpoint-circle w-8 h-8 {% if item.stage_progress >= pct %}bg-green-500{% else %}bg-gray-300{% endif %} border-4 border-white rounded-full mx-auto"></div>
+                                <p class="mt-2 font-semibold text-gray-700">{{ get_stage_display_name(st) }}</p>
+                                <div class="mt-2 w-20 mx-auto">
+                                    {% set map = item.stage_progress_map or {} %}
+                                    {% set sp = map.get(st, 0) %}
+                                    <div class="w-full bg-gray-200 rounded-full h-1">
+                                        <div class="bg-green-500 h-1 rounded-full" style="width: {{ sp }}%;"></div>
+                                    </div>
+                                    <p class="text-[10px] text-gray-500 text-center mt-1">{{ sp }}%</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="timeline-summary hidden mt-12 p-6 bg-gray-50 rounded-lg border border-gray-200">
+                        <h4 class="text-lg font-semibold text-blue-600 mb-4">{{ item.b_name }} - Summary</h4>
+                        <div class="timeline-summary-content">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h5 class="font-semibold text-gray-700 mb-2">Key Points</h5>
+                                    <p class="text-sm text-gray-600 mb-1"><strong>Company:</strong> {{ item.company }}</p>
+                                    <p class="text-sm text-gray-600 mb-1"><strong>Due Date:</strong> {{ item.due_date }}</p>
+                                    <p class="text-sm text-gray-600 mb-1"><strong>Decision:</strong> {{ item.decision or '-' }}</p>
+                                    <p class="text-sm text-gray-600 mb-1"><strong>Project Status:</strong> {{ item.project_status or '-' }}</p>
+                                    <p class="text-sm text-gray-600 mb-1"><strong>Work Status:</strong> {{ item.work_status or '-' }}</p>
+                                    <p class="text-sm text-gray-600"><strong>Description:</strong> {{ item.summary or '-' }}</p>
+                                </div>
+                                <div>
+                                    <h5 class="font-semibold text-gray-700 mb-2">Work Progress</h5>
+                                    <div class="w-full bg-gray-200 rounded-full h-3">
+                                        <div class="bg-blue-500 h-3 rounded-full" style="width: {{ item.progress_pct is not none and item.progress_pct or 0 }}%"></div>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-2">{{ item.progress_pct is not none and (item.progress_pct ~ '%') or 'N/A' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+                </div>
+
+            <!-- Projects Timeline -->
+            <div class="bg-gray-50 p-8 rounded-xl shadow-lg mb-8">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2">Projects Timeline</h2>
+                    <p class="text-gray-600">{{ company.name }} - Latest Won Projects</p>
+                </div>
+                <div class="space-y-10">
+                {% for item in won_projects %}
+                <div class="bg-white p-8 rounded-lg shadow-md overflow-hidden" data-bid-card="{{ item.g_id }}" data-stage-map='{{ (item.stage_progress_map|default({}))|tojson|safe }}'>
+                    <div class="flex justify-between items-center mb-12">
+                        <h3 class="text-xl font-semibold text-gray-900">{{ item.b_name }}</h3>
+                        <div class="flex items-center space-x-4">
+                            <span class="px-3 py-1 bg-green-100 text-green-700 text-sm font-semibold rounded-full">{{ item.company }}</span>
+                            <button class="timeline-summary-toggle flex items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
+                                <span>Dropdown for Summary</span>
+                                <i class="fas fa-chevron-down ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="relative w-full pr-4">
+                        <div class="absolute top-4 left-0 w-full h-1 bg-gray-200"></div>
+                        <div class="timeline-segments pointer-events-none">
+                            {% set seg_count = (item.stages|length - 1) if (item.stages|length - 1) > 0 else 0 %}
+                            {% if seg_count > 0 %}
+                                {% for i in range(seg_count) %}
+                                    {% set seg_stage = item.stages[i] %}
+                                    {% set map = item.stage_progress_map or {} %}
+                                    {% set sp = map.get(seg_stage, 0) %}
+                                    {% set leftpct = (100 * i / seg_count) %}
+                                    {% set widthpct = (sp / seg_count) %}
+                                    <div class="segment-progress absolute top-4 h-1 bg-green-500" data-stage="{{ seg_stage }}" style="left: {{ leftpct }}%; width: {{ widthpct }}%; z-index: 1;"></div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <div class="timeline-dot hidden absolute top-4 left-0 h-8 w-8 -translate-x-1/2 -translate-y-1/2" style="left: 0%; z-index: 20;">
+                            <div class="relative w-full h-full flex items-center justify-center">
+                                <div class="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
+                            </div>
+                        </div>
+                        <div class="relative flex justify-between">
+                            {% for st in item.stages %}
+                            <div class="timeline-checkpoint text-center" data-stage="{{ st }}">
+                                <div class="checkpoint-circle w-8 h-8 bg-gray-300 border-4 border-white rounded-full mx-auto"></div>
+                                <p class="mt-2 font-semibold text-gray-700">{{ get_stage_display_name(st) }}</p>
+                                <div class="mt-2 w-20 mx-auto">
+                                    {% set map = item.stage_progress_map or {} %}
+                                    {% set sp = map.get(st, 0) %}
+                                    <div class="w-full bg-gray-200 rounded-full h-1">
+                                        <div class="bg-green-500 h-1 rounded-full" style="width: {{ sp }}%;"></div>
+                                    </div>
+                                    <p class="text-[10px] text-gray-500 text-center mt-1">{{ sp }}%</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+            </div>
+            <!-- Projects Table -->
+            <div class="bg-white rounded-lg shadow-md">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">{{ company.name }} Projects</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tasks</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for project in projects %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ project.name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ project.due_date.strftime('%B %d, %Y') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-full bg-gray-200 rounded-full h-2 mr-2">
+                                            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ project.progress }}%"></div>
+                                        </div>
+                                        <span class="text-sm text-gray-600">{{ project.progress }}%</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                        {% if project.status == 'active' %}bg-green-100 text-green-800
+                                        {% elif project.status == 'completed' %}bg-blue-100 text-blue-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ project.status|title }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ project.tasks|length }} tasks
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        </main>
+    </div>
+
+    <!-- Expand modal for charts -->
+    <div id="chartExpandModal" class="fixed inset-0 bg-black/50 hidden z-50">
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-5xl">
+                <div class="flex justify-between items-center border-b px-4 py-2">
+                    <h4 id="chartExpandTitle" class="text-lg font-semibold text-gray-900">Chart</h4>
+                    <button id="chartExpandClose" class="p-2 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <canvas id="chartExpandCanvas" height="360"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mini charts: Bid Analyzer
+            try {
+                const stats = {{ (bid_stats or {})|tojson|safe }};
+                const projectsAll = {{ (go_projects or [])|tojson|safe }};
+                // Decision Mix - gradient bar
+                const decisionCtx = document.getElementById('companyDecisionBar')?.getContext('2d');
+                if (decisionCtx) {
+                    const grad = decisionCtx.createLinearGradient(0, 0, 0, 120);
+                    grad.addColorStop(0, '#60a5fa'); // blue-400
+                    grad.addColorStop(1, '#1d4ed8'); // blue-700
+                    const decisionChart = new Chart(decisionCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['GO','NO-GO','WON','LOST'],
+                            datasets: [{
+                                data: [stats.bids_go||0, stats.bids_no_go||0, stats.bids_won||0, stats.bids_lost||0],
+                                backgroundColor: [grad, '#ef4444', '#10b981', '#a855f7'],
+                                borderWidth: 0,
+                                borderRadius: 6,
+                                barThickness: 24
+                            }]
+                        },
+                        options: {
+                            animation: false,
+                            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                            scales: {
+                                x: { grid: { display: false } },
+                                y: { grid: { color: '#f3f4f6' }, ticks: { precision: 0 } }
+                            },
+                            responsive: false,
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+                // Pipeline - stacked horizontal bar (Submitted vs Remaining)
+                const pipelineCtx = document.getElementById('companyPipelineStack')?.getContext('2d');
+                if (pipelineCtx) {
+                    const submitted = stats.bids_submitted || 0;
+                    const total = stats.total_bids || 0;
+                    const remaining = Math.max(0, total - submitted);
+                    const pipelineChart = new Chart(pipelineCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Bids'],
+                            datasets: [
+                                { label: 'Submitted', data: [submitted], backgroundColor: '#06b6d4', borderRadius: 8, barThickness: 28, stack: 'stack1' },
+                                { label: 'Remaining', data: [remaining], backgroundColor: '#9ca3af', borderRadius: 8, barThickness: 28, stack: 'stack1' }
+                            ]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            animation: false,
+                            plugins: { legend: { position: 'bottom' } },
+                            scales: {
+                                x: { stacked: true, grid: { display: false }, ticks: { precision: 0 } },
+                                y: { stacked: true, grid: { display: false } }
+                            },
+                            responsive: false,
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+                // Scatter - Due days vs progress
+                const scatterCtx = document.getElementById('companyScatter')?.getContext('2d');
+                if (scatterCtx) {
+                    const projects = projectsAll;
+                    const now = Date.now();
+                    const toDays = (d) => Math.round((Date.parse(d || '') - now) / 86400000);
+                    const getProgress = (p) => {
+                        const sp = Number(p.stage_progress || 0);
+                        const wp = Number(p.work_progress_pct || 0);
+                        const pp = p.progress_pct != null ? Number(p.progress_pct) : NaN;
+                        return isNaN(pp) ? (wp || sp) : pp;
+                    };
+                    const makePoints = (filterFn, color) => ({
+                        label: filterFn.name || 'data',
+                        showLine: false,
+                        pointRadius: 4,
+                        pointBackgroundColor: color,
+                        data: projects.filter(filterFn).map(p => ({ x: toDays(p.due_date), y: Math.max(0, Math.min(100, getProgress(p))) }))
+                    });
+                    const won = makePoints(p => String(p.decision||'').toUpperCase()==='WON', '#10b981');
+                    const lost = makePoints(p => String(p.decision||'').toUpperCase()==='LOST', '#ef4444');
+                    const other = makePoints(p => !['WON','LOST'].includes(String(p.decision||'').toUpperCase()), '#3b82f6');
+                    const scatterChart = new Chart(scatterCtx, {
+                        type: 'scatter',
+                        data: { datasets: [other, won, lost] },
+                        options: {
+                            animation: false,
+                            plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: {
+                                label: (ctx) => `Due in ${ctx.parsed.x}d, progress ${ctx.parsed.y}%`
+                            }}},
+                            scales: {
+                                x: { title: { display: true, text: 'Days to Due Date' }, grid: { color: '#f3f4f6' } },
+                                y: { min: 0, max: 100, title: { display: true, text: 'Progress %' }, grid: { color: '#f3f4f6' } }
+                            },
+                            responsive: false,
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+                // Expand modal handling
+                const modal = document.getElementById('chartExpandModal');
+                const modalTitle = document.getElementById('chartExpandTitle');
+                const modalClose = document.getElementById('chartExpandClose');
+                const modalCtx = document.getElementById('chartExpandCanvas')?.getContext('2d');
+                let modalChart = null;
+                function buildDecisionConfig() {
+                    return {
+                        type: 'bar',
+                        data: {
+                            labels: ['GO','NO-GO','WON','LOST'],
+                            datasets: [{
+                                data: [stats.bids_go||0, stats.bids_no_go||0, stats.bids_won||0, stats.bids_lost||0],
+                                backgroundColor: ['#60a5fa','#ef4444','#10b981','#a855f7'],
+                                borderWidth: 0,
+                                borderRadius: 8
+                            }]
+                        },
+                        options: {
+                            animation: false,
+                            plugins: { legend: { display: false } },
+                            scales: { x: { grid: { display: false } }, y: { ticks: { precision: 0 } } },
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    };
+                }
+                function buildPipelineConfig() {
+                    const submitted = stats.bids_submitted || 0;
+                    const total = stats.total_bids || 0;
+                    const remaining = Math.max(0, total - submitted);
+                    return {
+                        type: 'bar',
+                        data: {
+                            labels: ['Bids'],
+                            datasets: [
+                                { label: 'Submitted', data: [submitted], backgroundColor: '#06b6d4', stack: 's' },
+                                { label: 'Remaining', data: [remaining], backgroundColor: '#9ca3af', stack: 's' }
+                            ]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            animation: false,
+                            plugins: { legend: { position: 'bottom' } },
+                            scales: { x: { stacked: true }, y: { stacked: true } },
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    };
+                }
+                function buildScatterConfig() {
+                    const now = Date.now();
+                    const toDays = (d) => Math.round((Date.parse(d || '') - now) / 86400000);
+                    const getProgress = (p) => {
+                        const sp = Number(p.stage_progress || 0);
+                        const wp = Number(p.work_progress_pct || 0);
+                        const pp = p.progress_pct != null ? Number(p.progress_pct) : NaN;
+                        return isNaN(pp) ? (wp || sp) : pp;
+                    };
+                    const pts = (filter, color, label) => ({
+                        label, showLine: false, pointRadius: 5, pointBackgroundColor: color,
+                        data: projectsAll.filter(filter).map(p => ({ x: toDays(p.due_date), y: Math.max(0, Math.min(100, getProgress(p))) }))
+                    });
+                    const won = pts(p => String(p.decision||'').toUpperCase()==='WON', '#10b981', 'Won');
+                    const lost = pts(p => String(p.decision||'').toUpperCase()==='LOST', '#ef4444', 'Lost');
+                    const other = pts(p => !['WON','LOST'].includes(String(p.decision||'').toUpperCase()), '#3b82f6', 'Open');
+                    return {
+                        type: 'scatter',
+                        data: { datasets: [other, won, lost] },
+                        options: {
+                            animation: false,
+                            plugins: { legend: { position: 'bottom' } },
+                            scales: {
+                                x: { title: { display: true, text: 'Days to Due Date' } },
+                                y: { min: 0, max: 100, title: { display: true, text: 'Progress %' } }
+                            },
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    };
+                }
+                function openModal(type) {
+                    if (!modalCtx) return;
+                    if (modalChart && modalChart.destroy) modalChart.destroy();
+                    let cfg, title = 'Chart';
+                    if (type === 'decision') { cfg = buildDecisionConfig(); title = 'Decision Mix'; }
+                    else if (type === 'pipeline') { cfg = buildPipelineConfig(); title = 'Pipeline'; }
+                    else if (type === 'scatter') { cfg = buildScatterConfig(); title = 'Timeline Scatter'; }
+                    modalTitle.textContent = title;
+                    modal.classList.remove('hidden');
+                    modalChart = new Chart(modalCtx, cfg);
+                }
+                function closeModal() {
+                    if (modalChart && modalChart.destroy) modalChart.destroy();
+                    modal.classList.add('hidden');
+                }
+                document.getElementById('chartExpandClose')?.addEventListener('click', closeModal);
+                document.getElementById('chartExpandModal')?.addEventListener('click', (e) => {
+                    if (e.target.id === 'chartExpandModal') closeModal();
+                });
+                document.querySelectorAll('[data-expand]').forEach(btn => {
+                    btn.addEventListener('click', () => openModal(btn.getAttribute('data-expand')));
+                });
+            } catch (e) {
+                console.warn('Mini charts init failed', e);
+            }
+            const timelineTrackers = document.querySelectorAll('.bg-white.p-8.rounded-lg.shadow-md');
+
+            timelineTrackers.forEach(tracker => {
+                const checkpoints = tracker.querySelectorAll('.timeline-checkpoint');
+                const timelineDot = tracker.querySelector('.timeline-dot');
+                const progressLine = tracker.querySelector('.timeline-progress');
+                const summaryToggle = tracker.querySelector('.timeline-summary-toggle');
+                const timelineSummary = tracker.querySelector('.timeline-summary');
+                const summaryTitle = timelineSummary ? timelineSummary.querySelector('h4') : null;
+                const summaryContent = timelineSummary ? timelineSummary.querySelector('.timeline-summary-content') : null;
+
+                // Apply embedded stage progress values (per stage + segments)
+                try {
+                    const mapAttr = tracker.getAttribute('data-stage-map');
+                    if (mapAttr) {
+                        const stageMap = JSON.parse(mapAttr);
+                        checkpoints.forEach(cp => {
+                            const stageKey = (cp.getAttribute('data-stage') || '').toLowerCase();
+                            const pct = Number(stageMap[stageKey] || 0);
+                            const bar = cp.querySelector('.bg-green-500.h-1.rounded-full');
+                            const label = cp.querySelector('p.text-[10px]');
+                            if (bar) bar.style.width = pct + '%';
+                            if (label) label.textContent = pct + '%';
+                        });
+
+                        const segCount = Math.max(0, checkpoints.length - 1);
+                        if (segCount > 0) {
+                            const segments = tracker.querySelectorAll('.segment-progress');
+                            for (let i = 0; i < segCount; i++) {
+                                const segStage = (checkpoints[i].getAttribute('data-stage') || '').toLowerCase();
+                                const pct = Number(stageMap[segStage] || 0);
+                                const widthPct = pct / segCount;
+                                if (segments[i]) segments[i].style.width = widthPct + '%';
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Stage map parse error', err);
+                }
+
+                if (progressLine) { progressLine.style.width = '0%'; progressLine.classList.add('hidden'); }
+                if (timelineDot) { timelineDot.classList.add('hidden'); }
+
+                checkpoints.forEach((checkpoint, index) => {
+                    checkpoint.addEventListener('click', function() {
+                        const stage = (this.dataset.stage || '').toLowerCase();
+
+                        if (timelineDot && checkpoints.length > 1) {
+                            const position = (index / (checkpoints.length - 1)) * 100;
+                            timelineDot.style.left = position + '%';
+                        }
+                        if (progressLine && checkpoints.length > 1) {
+                            const position = (index / (checkpoints.length - 1)) * 100;
+                            progressLine.style.width = position + '%';
+                        }
+
+                        checkpoints.forEach(cp => {
+                            const circle = cp.querySelector('.checkpoint-circle');
+                            if (circle) {
+                                circle.classList.remove('bg-green-500');
+                                circle.classList.add('bg-gray-300');
+                            }
+                            const label = cp.querySelector('p.mt-2');
+                            if (label) {
+                                label.classList.remove('text-blue-600');
+                                label.classList.add('text-gray-700');
+                            }
+                        });
+
+                        const activeCircle = this.querySelector('.checkpoint-circle');
+                        if (activeCircle) {
+                            activeCircle.classList.remove('bg-gray-300');
+                            activeCircle.classList.add('bg-green-500');
+                        }
+
+                        const activeLabel = this.querySelector('p.mt-2');
+                        if (activeLabel) {
+                            activeLabel.classList.remove('text-gray-700');
+                            activeLabel.classList.add('text-blue-600');
+                        }
+
+                        if (summaryTitle && summaryContent) {
+                            updateSummary(stage, summaryTitle, summaryContent);
+                        }
+                    });
+                });
+
+                if (summaryToggle && timelineSummary) {
+                    summaryToggle.addEventListener('click', function() {
+                        timelineSummary.classList.toggle('hidden');
+                        const arrow = this.querySelector('i');
+                        if (arrow) arrow.classList.toggle('rotate-180');
+                    });
+                }
+            });
+
+            function updateSummary(stage, summaryTitle, summaryContent) {
+                const summaryData = {
+                    analyzer: {
+                        title: "BID Analyzer Summary",
+                        content: [
+                            "Review of tender documents and project scope.",
+                            "Conduct initial viability and profitability assessment.",
+                            "Plan for necessary resource allocation."
+                        ]
+                    },
+                    business: {
+                        title: "Business Development Summary",
+                        content: [
+                            "Making of Proposals",
+                            "Creation of Helioscope Reports",
+                            "Track and nurture incoming leads",
+                            "Maintain regular client follow-ups and communication"
+                        ]
+                    },
+                    design: {
+                        title: "Design Team Summary",
+                        content: [
+                            "Preparation of detailed technical drawings",
+                            "Creation of Single-Line Diagrams (SLD)",
+                            "Finalization of the Bill of Quantities (BOQ)"
+                        ]
+                    },
+                    operations: {
+                        title: "Operations Summary",
+                        content: [
+                            "Conduct project kick-off meetings with stakeholders",
+                            "Manage procurement of materials and equipment",
+                            "Coordinate and manage vendors and subcontractors",
+                            "Develop and maintain the project execution schedule"
+                        ]
+                    },
+                    engineer: {
+                        title: "Site Engineer Summary",
+                        content: [
+                            "Provide on-site supervision of all activities",
+                            "Implement and monitor quality control checks",
+                            "Manage the installation process from start to finish",
+                            "Compile and submit daily progress reports"
+                        ]
+                    },
+                    handover: {
+                        title: "Submitted / Closure Summary",
+                        content: [
+                            "Compile and deliver all final project documentation",
+                            "Provide client training and a final project walkthrough",
+                            "Finalize warranty and ongoing service agreements",
+                            "Complete the official project closure process"
+                        ]
+                    }
+                };
+
+                const normalizedStage = stage || '';
+                const data = summaryData[normalizedStage] || summaryData[normalizedStage.replace(' ', '_')];
+                if (data && summaryTitle && summaryContent) {
+                    summaryTitle.textContent = data.title;
+                    summaryContent.innerHTML = data.content.map(item => `
+                        <p class="text-sm text-gray-600">${item}</p>
+                    `).join('');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

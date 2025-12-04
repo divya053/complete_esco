@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervisor Projects</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body class="bg-light">
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Supervisor Projects</h1>
+        <div class="text-muted">
+            <i class="fas fa-user-shield"></i> {{ user.email }} ({{ user.role.title() }})
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0"><i class="fas fa-clipboard-list"></i> Win/Lost Results</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>W ID</th>
+                            <th>Assignment ID</th>
+                            <th>Bid Name</th>
+                            <th>Company</th>
+                            <th>In Date</th>
+                            <th>Due Date</th>
+                            <th>Stage</th>
+                            <th>Scope</th>
+                            <th>Value</th>
+                            <th>Department</th>
+                            <th>Person</th>
+                            <th>Status</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in projects %}
+                        <tr>
+                            <td>{{ row.w_id }}</td>
+                            <td>{{ row.a_id }}</td>
+                            <td>{{ row.b_name or 'N/A' }}</td>
+                            <td>{{ row.company or 'N/A' }}</td>
+                            <td>{{ row.in_date or 'N/A' }}</td>
+                            <td>{{ row.due_date or 'N/A' }}</td>
+                            <td>{{ row.state or 'N/A' }}</td>
+                            <td>{{ row.scope or 'N/A' }}</td>
+                            <td>{{ row.value or 'N/A' }}</td>
+                            <td>{{ row.department or 'N/A' }}</td>
+                            <td>{{ row.person_name or 'N/A' }}</td>
+                            <td>{{ row.status or 'N/A' }}</td>
+                            <td>{{ row.result or 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+
+
+

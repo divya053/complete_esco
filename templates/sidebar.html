@@ -1,0 +1,129 @@
+<aside class="w-64 bg-white p-6 flex flex-col justify-between border-r border-gray-200">
+    <div>
+        <div class="flex items-center mb-10" id="logo-container">
+            <!-- Default ESCO Logo -->
+            <div id="esco-logo" class="flex items-center">
+                <i class="fas fa-bolt text-3xl text-blue-600 mr-3"></i>
+                <h1 class="text-2xl font-bold text-gray-900">ESCO</h1>
+            </div>
+            
+            <!-- Ikio Logo (hidden by default) -->
+            <div id="ikio-logo" class="  flex items-center hidden">
+                <div class="w-28 h-20 ml-10 flex items-center justify-center" style="margin-bottom: -20px;">
+                    <img src="{{ url_for('static', filename='ikio.png') }}" alt="Ikio Logo" class="w-full h-full object-contain">
+                </div>
+                <!-- <div>
+                    <h1 class="text-xl font-bold text-gray-900">IKIO</h1>
+                    <p class="text-xs text-gray-600">LED LIGHTING</p>
+                </div> -->
+            </div>
+            
+            <!-- Metco Logo (hidden by default) -->
+            <div id="metco-logo" class="flex items-center hidden">
+                <div class="w-28 h-20 ml-10 flex items-center justify-center" style="margin-bottom: -20px;">
+                    <img src="{{ url_for('static', filename='metco.png') }}" alt="Metco Logo" class="w-full h-full object-contain">
+                </div>
+            </div>
+            
+            <!-- Sunsprint Logo (hidden by default) -->
+            <div id="sunsprint-logo" class="flex items-center hidden">
+                <div class="w-28 h-20 ml-10 flex items-center justify-center" style="margin-bottom: -20px;">
+                    <img src="{{ url_for('static', filename='sunsprint.png') }}" alt="Sunsprint Logo" class="w-full h-full object-contain">
+                </div>
+            </div>
+        </div>
+        <nav>
+            <ul class="space-y-1">
+                <li class="mb-4"><a href="{{ url_for('master_dashboard') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]" data-company="esco"><i class="fas fa-tachometer-alt mr-3"></i>Master Dashboard</a></li>
+                <li class="mb-4"><a href="{{ url_for('company_dashboard', company_name='ikio') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]" data-company="ikio"><i class="fas fa-building mr-3"></i>IKIO</a></li>
+                <li class="mb-4"><a href="{{ url_for('company_dashboard', company_name='metco') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]" data-company="metco"><i class="fas fa-building mr-3"></i>METCO</a></li>
+                <li class="mb-4"><a href="{{ url_for('company_dashboard', company_name='sunsprint') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]" data-company="sunsprint"><i class="fas fa-building mr-3"></i>SUNSPRINT</a></li>
+                <li class="mb-4"><a href="{{ url_for('bid_analyzer') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]"><i class="fas fa-chart-pie mr-3"></i>Bid Analyzer</a></li>
+                <li class="mb-4"><a href="{{ url_for('database_management') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]"><i class="fas fa-database mr-3"></i>Databases</a></li>
+                <li class="mb-4"><a href="{{ url_for('profiling') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]"><i class="fas fa-building-user mr-3"></i>Profiling</a></li>
+                {% if current_user.is_admin %}
+                <li class="mb-4"><a href="{{ url_for('users_admin') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]"><i class="fas fa-users-cog mr-3"></i>Users</a></li>
+                {% endif %}
+                <li class="mb-4"><a href="{{ url_for('logs_page') }}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 text-[15px]"><i class="fas fa-history mr-3"></i>Logs</a></li>
+            </ul>
+        </nav>
+    </div>
+    <div>
+        <a href="{{ url_for('logout') }}" class="flex items-center p-3 hover:bg-gray-100 rounded-lg transition-all"><i class="fas fa-sign-out-alt mr-3"></i>Logout</a>
+    </div>
+</aside>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Function to switch logo based on company
+    function switchLogo(company) {
+        // Hide all logos
+        document.getElementById('esco-logo').classList.add('hidden');
+        document.getElementById('ikio-logo').classList.add('hidden');
+        document.getElementById('metco-logo').classList.add('hidden');
+        document.getElementById('sunsprint-logo').classList.add('hidden');
+        
+        // Show the selected company logo
+        if (company === 'ikio') {
+            document.getElementById('ikio-logo').classList.remove('hidden');
+        } else if (company === 'metco') {
+            document.getElementById('metco-logo').classList.remove('hidden');
+        } else if (company === 'sunsprint') {
+            document.getElementById('sunsprint-logo').classList.remove('hidden');
+        } else {
+            // Default to ESCO logo
+            document.getElementById('esco-logo').classList.remove('hidden');
+        }
+    }
+    
+    // Add click event listeners to navigation links
+    const navLinks = document.querySelectorAll('.nav-link');
+    function setActive(link) {
+        navLinks.forEach(l => {
+            l.classList.remove('bg-blue-100', 'text-blue-600', 'font-semibold');
+            l.classList.add('hover:bg-gray-100');
+        });
+        link.classList.add('bg-blue-100', 'text-blue-600', 'font-semibold');
+        link.classList.remove('hover:bg-gray-100');
+    }
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            const company = this.getAttribute('data-company');
+            switchLogo(company);
+            setActive(this);
+        });
+    });
+    
+    // Set initial logo based on current page
+    {% if current_company %}
+        switchLogo('{{ current_company }}');
+    {% else %}
+        const currentPath = window.location.pathname;
+        if (currentPath.includes('/company/ikio')) {
+            switchLogo('ikio');
+        } else if (currentPath.includes('/company/metco')) {
+            switchLogo('metco');
+        } else if (currentPath.includes('/company/sunsprint')) {
+            switchLogo('sunsprint');
+        } else {
+            switchLogo('esco');
+        }
+    {% endif %}
+    
+    // Highlight active link by URL match on initial load
+    const path = window.location.pathname;
+    let matched = false;
+    navLinks.forEach(l => {
+        const href = l.getAttribute('href') || '';
+        if (href && path.startsWith(href)) {
+            setActive(l);
+            matched = true;
+        }
+    });
+    if (!matched && navLinks.length) {
+        // Fallback to first link (Master Dashboard)
+        setActive(navLinks[0]);
+    }
+});
+</script>
+

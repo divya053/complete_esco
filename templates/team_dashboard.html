@@ -1,0 +1,1959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ team_display_name }} Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="flex h-screen">
+        {% include 'sidebar.html' %}
+
+        <main class="flex-1 p-8 overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">{{ team_display_name }} Dashboard</h2>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-gray-600">Current Stage: <span class="font-semibold">{{ current_stage|replace('_',' ')|capitalize }}</span></div>
+                    <!-- <button id="headerBoardBtn" type="button" class="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 transition-colors">
+                        <i class="fa-solid fa-table-columns mr-2"></i>Board View
+                    </button> -->
+                    <a href="/team/{{ team }}/employees" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-users mr-2"></i>Manage Employees
+                    </a>
+                </div>
+            </div>
+
+            <!-- Team Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                            <i class="fas fa-clipboard-list text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Total Bids</p>
+                            <p class="text-2xl font-bold text-gray-900">{{ total_bids }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-green-100 text-green-600">
+                            <i class="fas fa-check-circle text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Completed</p>
+                            <p class="text-2xl font-bold text-gray-900">{{ completed_bids }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex items-center">
+                        <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                            <i class="fas fa-clock text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">In Progress</p>
+                            <p class="text-2xl font-bold text-gray-900">{{ total_bids - completed_bids }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assigned Bids - Microsoft Planner style -->
+            <div class="bg-gray-200 text-gray-900 p-6 rounded-lg shadow-md">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-semibold">Assigned Bids</h3>
+                    <div class="flex items-center gap-3 text-xs">
+                        <div class="inline-flex rounded overflow-hidden border border-gray-900 text-gray-100">
+                            <button id="tabGrid" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700">Grid</button>
+                            <button id="tabBoard" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600">Board</button>
+                        </div>
+                        <div class="flex items-center gap-2 ">
+                            <span class="text-gray-900">Bucket</span>
+                            <select id="boardBucketFilter" class="px-2 py-1 rounded bg-gray-700 border border-gray-900 text-gray-200">
+                                <option value="__all__">All buckets</option>
+                                <option value="ready">Ready To Start</option>
+                                <option value="inprogress">In Progress</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+                        <div class="relative">
+                            <button id="groupByBtn" type="button" class="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-700 border border-gray-700 text-gray-200 inline-flex items-center gap-2">
+                                <i class="fa-solid fa-layer-group"></i>
+                                Group by <span id="groupByLabel" class="font-medium">Bucket</span>
+                                <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                            </button>
+                            <div id="groupByMenu" class="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded shadow-lg hidden z-20">
+                                <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-800 text-gray-200 text-xs" data-group="bucket"><i class="fa-regular fa-table-cells mr-2"></i>Bucket</button>
+                                <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-800 text-gray-200 text-xs" data-group="assignee"><i class="fa-regular fa-user mr-2"></i>Assigned to</button>
+                                <div class="border-t border-gray-700 my-1"></div>
+                                <button type="button" class="w-full text-left px-3 py-2 text-gray-500 cursor-not-allowed text-xs"><i class="fa-regular fa-circle-half-stroke mr-2"></i>Progress</button>
+                                <button type="button" class="w-full text-left px-3 py-2 text-gray-500 cursor-not-allowed text-xs"><i class="fa-regular fa-calendar mr-2"></i>Due date</button>
+                                <button type="button" class="w-full text-left px-3 py-2 text-gray-500 cursor-not-allowed text-xs"><i class="fa-regular fa-tag mr-2"></i>Labels</button>
+                                <button type="button" class="w-full text-left px-3 py-2 text-gray-500 cursor-not-allowed text-xs"><i class="fa-regular fa-thermometer-half mr-2"></i>Priority</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto text-gray-900">
+                    <table id="gridContainer" class="min-w-full whitespace-nowrap">
+                        <thead class="text-xs uppercase tracking-wider text-gray-900 border-b border-gray-700">
+                            <tr class="bg-gray-300">
+                                <th class="px-4 py-3 text-left">Task Name
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">Assignment
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">Start date
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">Due date
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">Bucket
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">State
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">Progress
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">Priority
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">Labels
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                <th class="px-4 py-3 text-left">RFP Files
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                {% if team == 'business' %}
+                                <th class="px-4 py-3 text-left">Proposal Making
+                                    <i class="fa-solid fa-sort ml-1 opacity-50"></i>
+                                </th>
+                                {% endif %}
+                                <th class="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm text-gray-900">
+                            {% for bid in bids %}
+                            <tr class="odd:bg-gray-300 even:bg-gray-200 hover:bg-gray-200/80 transition-colors border-b border-gray-700 text-gray-900"
+                                data-bid-row="{{ bid.id }}"
+                                data-current-stage="{{ bid.current_stage }}"
+                                data-person-name="{{ bid.person_name or '' }}"
+                                data-person-email="{{ bid.person_email or '' }}"
+                                data-dyn-stages='{{ (bid.dyn_stages or []) | tojson | safe }}'>
+                                <!-- Task Name -->
+                                <td class="px-4 py-4 align-top">
+                                    <div class="font-semibold text-gray-900">{{ bid.name }}</div>
+                                    <div class="text-xs text-gray-600">{{ bid.company or 'N/A' }}</div>
+                                </td>
+                                <!-- Assignment -->
+                                <td class="px-4 py-4 align-top">
+                                    <label class="block text-xs text-gray-600 mb-1">Assign to</label>
+                                    <div class="flex flex-wrap gap-1" data-assignees data-bid-id="{{ bid.id }}"></div>
+                                    <button type="button" class="mt-1 px-2 py-1 text-xs rounded bg-gray-800 text-white hover:bg-gray-900" data-assignees-btn data-bid-id="{{ bid.id }}">+ Add</button>
+                                </td>
+                                <!-- Start date -->
+                                <td class="px-4 py-4 align-top">
+                                    <span class="text-gray-700">{{ bid.in_date or '—' }}</span>
+                                </td>
+                                <!-- Due date -->
+                                <td class="px-4 py-4 align-top">
+                                    <span class="text-gray-900">{{ bid.due_date or 'N/A' }}</span>
+                                </td>
+                                <!-- Bucket (Checklist status, independent of team stage) -->
+                                <td class="px-4 py-4 align-top">
+                                    <span id="bucketLabel_{{ bid.id }}" class="px-2 py-1 rounded-full text-xs bg-indigo-100 text-indigo-700 border border-indigo-200">Ready To Start</span>
+                                </td>
+                                <!-- Current stage (read-only) -->
+                                <td class="px-4 py-4 align-top">
+                                    <span class="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border border-gray-300">
+                                        {{ (bid.current_stage or 'analyzer')|replace('_',' ')|title }}
+                                    </span>
+                                </td>
+                                <!-- Progress -->
+                                <td class="px-4 py-4 align-top">
+                                    <div class="w-40">
+                                        <div class="w-full h-2 rounded-full bg-gray-200">
+                                            <div id="progressBarRow_{{ bid.id }}"
+                                                class="h-2 rounded-full bg-emerald-500 transition-all duration-300"
+                                                style="width: 0%"></div>
+                                        </div>
+                                        <div class="mt-1 text-[11px] text-gray-600">
+                                            <i class="fa-regular fa-circle-check mr-1 text-emerald-500"></i>
+                                            <span id="progressPctRow_{{ bid.id }}">0%</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <!-- Priority (placeholder mapping) -->
+                                <td class="px-4 py-4 align-top">
+                                    {% set _prio = 'Medium' %}
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs
+                                                 {% if _prio == 'Important' %} bg-red-600/20 text-red-900 border border-red-600/40
+                                                 {% elif _prio == 'Low' %} bg-gray-600/20 text-gray-900 border border-gray-500/40
+                                                 {% else %} bg-yellow-500/20 text-yellow-900 border border-yellow-600/40 {% endif %}">
+                                        {% if _prio == 'Important' %}
+                                            <i class="fa-solid fa-circle-exclamation"></i>
+                                        {% elif _prio == 'Low' %}
+                                            <i class="fa-solid fa-arrow-down"></i>
+                                        {% else %}
+                                            <i class="fa-solid fa-arrow-right"></i>
+                                                {% endif %}
+                                        {{ _prio }}
+                                    </span>
+                                </td>
+                                <!-- Labels -->
+                                <td class="px-4 py-4 align-top text-center">
+                                    <div class="flex flex-wrap gap-1.5 text-center">
+                                        {% if bid.company %}
+                                        <span class="px-2 py-0.5 rounded-full text-x text-center bg-sky-900/80 text-gray-200 border border-sky-600/40">
+                                            {{ bid.company }}
+                                        <!-- </span>
+                                        {% endif %}
+                                        {% set _decision = (bid.wl_result or bid.decision or 'GO') %}
+                                        <span class="px-2 py-0.5 rounded-full text-xs
+                                                     {% if _decision == 'WON' %} bg-emerald-600/20 text-emerald-300 border border-emerald-600/40
+                                                     {% elif _decision in ['NO-GO','LOST'] %} bg-rose-600/20 text-rose-300 border border-rose-600/40
+                                                     {% else %} bg-indigo-600/20 text-indigo-300 border border-indigo-600/40 {% endif %}">
+                                            {{ _decision }}
+                                        </span> -->
+                                    </div>
+                                </td>
+                                <!-- RFP Files -->
+                                <td class="px-4 py-4 align-top">
+                                    {% if bid.rfp_files and bid.rfp_files|length > 0 %}
+                                        <div class="space-y-1">
+                                            {% for rfp_file in bid.rfp_files %}
+                                            {% set display_name = (rfp_file.filename or rfp_file.original_filename or 'Unnamed RFP') %}
+                                            <div class="flex items-center gap-1 mb-1">
+                                                <span class="text-xs text-gray-600 truncate max-w-[120px]" title="{{ display_name }}">
+                                                    <i class="fas fa-file-pdf text-red-500 mr-1"></i>{{ display_name[:20] }}{% if display_name|length > 20 %}...{% endif %}
+                                                </span>
+                                                <div class="flex gap-1">
+                                                    <a href="{{ url_for('view_rfp_file', file_id=rfp_file.id) }}" 
+                                                       target="_blank"
+                                                       class="px-2 py-0.5 rounded bg-blue-500 hover:bg-blue-600 text-white text-[10px] transition-colors"
+                                                       title="View RFP">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{{ url_for('download_rfp_file', file_id=rfp_file.id) }}" 
+                                                       class="px-2 py-0.5 rounded bg-green-500 hover:bg-green-600 text-white text-[10px] transition-colors"
+                                                       title="Download RFP">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <button type="button"
+                                                class="mt-2 inline-flex items-center gap-1 px-3 py-1 text-[11px] rounded bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+                                                data-g-id="{{ bid.id }}"
+                                                data-bid-name="{{ bid.name|e }}"
+                                                onclick="openParsedPdfModalFromEl(this)">
+                                            <i class="fas fa-file-alt"></i>Parse PDF Text
+                                        </button>
+                                    {% else %}
+                                        <span class="text-xs text-gray-400 italic">No RFP files</span>
+                                    {% endif %}
+                                </td>
+                                <!-- Proposal Making -->
+                                {% if team == 'business' %}
+                                <td class="px-4 py-4 align-top">
+                                    <button type="button" 
+                                            class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors generate-proposals-btn"
+                                            data-bid-id="{{ bid.id }}"
+                                            data-bid-name="{{ bid.name }}"
+                                            data-bid-company="{{ bid.company or '' }}"
+                                            title="Generate Proposals">
+                                        <i class="fas fa-file-alt mr-1"></i>Generate Proposals
+                                    </button>
+                                </td>
+                                {% endif %}
+                                <!-- Actions (no Manage Timeline; inline bucket selector replaces it) -->
+                                <td class="px-4 py-4 align-top">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button class="px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-xs"
+                                                onclick="showTransferModal({{ bid.id }}, '{{ bid.name }}')"
+                                                title="Transfer">
+                                            <i class="fas fa-exchange-alt"></i>
+                                        </button>
+                                        <button class="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-white text-xs"
+                                                data-bid-id="{{ bid.id }}"
+                                                data-bid-name="{{ bid.name|e }}"
+                                                data-company="{{ (bid.company or 'N/A')|e }}"
+                                                data-due-date="{{ (bid.due_date or 'N/A')|e }}"
+                                                data-decision="{{ (bid.wl_result or 'GO')|e }}"
+                                                data-project-status="{{ (bid.project_status or 'ongoing')|e }}"
+                                                data-work-status="{{ (bid.work_status or 'Initiated by BID Analyzer')|e }}"
+                                                data-description="{{ (bid.summary or 'No description available')|e }}"
+                                                onclick="showBidSummaryFromEl(this)"
+                                                title="Summary">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if bids|length == 0 %}
+                            <tr class="bg-gray-900">
+                                <td colspan="{{ 12 if team == 'business' else 11 }}" class="p-6 text-center text-gray-400">
+                                    <i class="fas fa-inbox text-4xl text-gray-600 mb-2"></i>
+                                    <p>No bids assigned to {{ team_display_name }}</p>
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Board view -->
+                <div id="boardContainer" class="hidden mt-4 ">
+                    <div id="boardColumns" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3  gap-6"></div>
+                </div>
+                
+            </div>
+
+            <!-- Add Task Section (Hidden by default) -->
+            
+
+            <!-- Task Checklist Table (Hidden by default) -->
+            <div id="taskChecklistSection" class="bg-white rounded-lg shadow-md mb-8 mt-8 hidden">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold">Task Checklist for: <span id="checklistBidName" class="text-blue-600"></span></h3>
+                        <button onclick="hideChecklistSection()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <!-- Progress Bar -->
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">Progress</span>
+                            <span id="progressPercentage" class="text-sm font-medium text-gray-700">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">According to Task Completed</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="p-3 text-left">Task Name</th>
+                                <th class="p-3 text-left">Person Name</th>
+                                <th class="p-3 text-left">Email</th>
+                                <th class="p-3 text-left">Due Date</th>
+                                <th class="p-3 text-left">Designation</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="taskChecklistTableBody">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="addTaskSection" class="bg-white p-6 rounded-lg shadow-md mb-8 hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">Add Task for: <span id="selectedBidName" class="text-blue-600"></span></h3>
+                    <button onclick="hideChecklistSection()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <form id="addTaskForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <input type="hidden" id="selectedBidId" name="g_id">
+                    <div>
+                        <label for="task_name" class="block text-sm font-medium text-gray-700 mb-2">Task Name</label>
+                        <input type="text" id="task_name" name="task_name" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="assigned_to" class="block text-sm font-medium text-gray-700 mb-2">Assign To</label>
+                        <select id="assigned_to" name="assigned_to" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Employee</option>
+                            <!-- Will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="priority" class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                        <select id="priority" name="priority" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="due_date" class="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                        <input type="datetime-local" id="due_date" name="due_date" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="md:col-span-2 lg:col-span-4">
+                        <label for="description" class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="description" name="description" rows="3" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                  placeholder="Task description..."></textarea>
+                    </div>
+                    <div class="md:col-span-2 lg:col-span-4">
+                        <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Add Task
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <!-- Live Activity Log -->
+            <!-- <div class="mt-8 bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold mb-4">Live Activity Log</h3>
+                <div id="activity-log" class="space-y-2 max-h-64 overflow-y-auto">
+                    <p class="text-gray-500 text-sm">Activity updates will appear here in real-time...</p>
+                </div>
+            </div> -->
+        </main>
+    </div>
+
+    <!-- Board Bid Detail Modal (Planner-like) -->
+    <div id="boardBidModal" class="fixed inset-0 bg-black/60 hidden z-50">
+        <div class="relative top-10 mx-auto w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 bg-white rounded shadow-xl max-h-[85vh] overflow-hidden">
+            <div class="p-5 border-b flex items-start justify-between">
+                <div>
+                    <div id="bbm_plan" class="text-xs text-blue-600"></div>
+                    <div id="bbm_title" class="text-xl font-semibold text-gray-900"></div>
+                    <div class="mt-2 flex items-center gap-3 text-sm text-gray-700">
+                        <div id="bbm_labels" class="flex items-center gap-1"></div>
+                    </div>
+                </div>
+                <button onclick="closeBoardBidModal()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="p-5 space-y-5 overflow-y-auto max-h-[75vh]">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Bucket</label>
+                        <div id="bbm_bucket"></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Progress</label>
+                        <select id="bbm_progress" class="w-full border rounded px-3 py-2 text-sm">
+                            <option>Not started</option>
+                            <option>In progress</option>
+                            <option>Completed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Priority</label>
+                        <select id="bbm_priority" class="w-full border rounded px-3 py-2 text-sm">
+                            <option>Low</option>
+                            <option selected>Medium</option>
+                            <option>High</option>
+                            <option>Urgent</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Start date</label>
+                        <input id="bbm_start" type="date" class="w-full border rounded px-3 py-2 text-sm" disabled>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Due date</label>
+                        <input id="bbm_due" type="date" class="w-full border rounded px-3 py-2 text-sm" disabled>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Repeat</label>
+                        <select id="bbm_repeat" class="w-full border rounded px-3 py-2 text-sm" disabled>
+                            <option>Does not repeat</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Assign to Team</label>
+                    <div class="flex flex-wrap gap-2 mb-2" id="bbm_team_assignees"></div>
+                    <button type="button" id="bbm_assign_team_btn" class="px-3 py-1.5 text-xs rounded bg-gray-800 text-white hover:bg-gray-900">+ Assign Team Members</button>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Notes</label>
+                    <textarea id="bbm_notes" rows="4" class="w-full border rounded px-3 py-2 text-sm" placeholder="Write a note..."></textarea>
+                    <div class="text-right mt-2">
+                        <button id="bbm_save_notes" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Save</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between">
+                        <label class="block text-sm font-medium text-gray-700">Checklist</label>
+                        <span id="bbm_check_counts" class="text-xs text-gray-500"></span>
+                    </div>
+                    <div id="bbm_checklist" class="mt-2 divide-y border rounded"></div>
+                    <form id="bbm_add_task" class="mt-3 grid grid-cols-1 md:grid-cols-5 gap-2">
+                        <input type="text" id="bbm_new_task" class="border rounded px-3 py-2 text-sm md:col-span-2" placeholder="Add an item">
+                        <input type="date" id="bbm_new_due" class="border rounded px-3 py-2 text-sm">
+                        <select id="bbm_assign_to" class="border rounded px-3 py-2 text-sm">
+                            <option value="">Assign to…</option>
+                        </select>
+                        <button class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-sm">Add</button>
+                    </form>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Attachments</label>
+                    <div class="mt-2">
+                        <input id="bbm_attach_file" type="file" class="hidden">
+                        <button id="bbm_attach_btn" class="px-3 py-1.5 bg-gray-800 text-white rounded text-sm">Add attachment</button>
+                        <div class="text-xs text-gray-500 mt-1">Attachment is saved as a checklist item linked to this bid.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bid Summary Modal -->
+    <div id="bidSummaryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between mb-4">
+                    <h3 id="modalTitle" class="text-lg font-semibold text-gray-900"></h3>
+                    <button onclick="closeBidSummary()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Modal Content -->
+                <div class="grid grid-cols-1 gap-6">
+                    <!-- Key Points -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Key Points</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="font-medium text-gray-600">Company:</span>
+                                <span id="modalCompany" class="text-gray-900"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium text-gray-600">Due Date:</span>
+                                <span id="modalDueDate" class="text-gray-900"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium text-gray-600">Decision:</span>
+                                <span id="modalDecision" class="text-gray-900"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium text-gray-600">Project Status:</span>
+                                <span id="modalProjectStatus" class="text-gray-900"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium text-gray-600">Work Status:</span>
+                                <span id="modalWorkStatus" class="text-gray-900"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium text-gray-600">Description:</span>
+                                <span id="modalDescription" class="text-gray-900 text-right max-w-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                    <button onclick="closeBidSummary()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parsed PDF Modal -->
+    <div id="parsedPdfModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden z-50">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="bg-white w-full max-w-4xl rounded-lg shadow-xl">
+                <div class="flex items-center justify-between border-b px-5 py-4">
+                    <h3 id="parsedPdfModalTitle" class="text-lg font-semibold text-gray-900">Parsed PDF</h3>
+                    <button type="button" class="text-gray-500 hover:text-gray-700" onclick="closeParsedPdfModal()">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+                <div class="px-5 py-4 space-y-4">
+                    <div id="parsedPdfStatus" class="text-sm text-gray-500">Select an RFP to parse.</div>
+                    <div id="parsedPdfPageContainer" class="hidden max-h-[55vh] overflow-y-auto space-y-4 text-sm text-gray-800"></div>
+                </div>
+                <div class="flex items-center justify-between border-t px-5 py-4">
+                    <div id="parsedPdfMeta" class="text-xs text-gray-500"></div>
+                    <div class="flex items-center gap-2">
+                        <button id="parsedPdfLoadMore" type="button" class="hidden px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm" onclick="loadMoreParsedPdfPages()">Load more pages</button>
+                        <button type="button" class="px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm" onclick="closeParsedPdfModal()">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Socket.IO connection for real-time updates
+        const socket = io();
+        // Bid IDs present in the table for computing per-bid progress
+        const bidIds = [{% for bid in bids %}{{ bid.id }}{% if not loop.last %}, {% endif %}{% endfor %}];
+        // Raw bids data for client-side board rendering
+        const bidsData = {{ bids | tojson | safe }};
+        const parsedPdfState = {
+            gId: null,
+            nextStart: null,
+            totalPages: 0,
+            firstLoaded: null,
+            lastLoaded: null,
+        };
+
+        function openParsedPdfModalFromEl(btn) {
+            if (!btn) return;
+            const gId = parseInt(btn.getAttribute('data-g-id'));
+            const bidName = btn.getAttribute('data-bid-name') || 'RFP';
+            if (!gId) {
+                alert('Unable to determine the associated project.');
+                return;
+            }
+            openParsedPdfModal(gId, bidName);
+        }
+
+        async function openParsedPdfModal(gId, bidName) {
+            parsedPdfState.gId = gId;
+            parsedPdfState.nextStart = null;
+            parsedPdfState.totalPages = 0;
+            parsedPdfState.firstLoaded = null;
+            parsedPdfState.lastLoaded = null;
+
+            const modal = document.getElementById('parsedPdfModal');
+            const titleEl = document.getElementById('parsedPdfModalTitle');
+            const statusEl = document.getElementById('parsedPdfStatus');
+            const pageContainer = document.getElementById('parsedPdfPageContainer');
+            const loadMoreBtn = document.getElementById('parsedPdfLoadMore');
+            const metaEl = document.getElementById('parsedPdfMeta');
+
+            if (titleEl) titleEl.textContent = `Parsed PDF – ${bidName}`;
+            if (pageContainer) {
+                pageContainer.innerHTML = '';
+                pageContainer.classList.add('hidden');
+            }
+            if (metaEl) metaEl.textContent = '';
+            if (loadMoreBtn) loadMoreBtn.classList.add('hidden');
+            if (statusEl) {
+                statusEl.textContent = 'Loading pages...';
+                statusEl.classList.remove('text-red-500', 'text-yellow-600');
+                statusEl.classList.add('text-gray-500');
+            }
+            if (modal) modal.classList.remove('hidden');
+
+            await fetchParsedPdfPages(gId, 1, false);
+        }
+
+        async function fetchParsedPdfPages(gId, startPage, append) {
+            const statusEl = document.getElementById('parsedPdfStatus');
+            const pageContainer = document.getElementById('parsedPdfPageContainer');
+            const loadMoreBtn = document.getElementById('parsedPdfLoadMore');
+            const metaEl = document.getElementById('parsedPdfMeta');
+
+            if (!pageContainer) return;
+
+            try {
+                const response = await fetch(`/api/rfp-file/${gId}/parsed?start=${startPage}&limit=3`);
+                if (!response.ok) {
+                    let message = 'Failed to parse PDF.';
+                    try {
+                        const errJson = await response.json();
+                        message = errJson.message || message;
+                    } catch (_) {}
+                    throw new Error(message);
+                }
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(data.message || 'Failed to parse PDF.');
+                }
+
+                const pages = data.pages || [];
+                parsedPdfState.nextStart = data.next_start || null;
+                parsedPdfState.totalPages = data.total_pages || 0;
+
+                if (!append) {
+                    pageContainer.innerHTML = '';
+                }
+
+                if (!pages.length && !append) {
+                    if (statusEl) {
+                        statusEl.textContent = 'No text could be extracted from this PDF.';
+                        statusEl.classList.remove('text-gray-500', 'text-red-500');
+                        statusEl.classList.add('text-yellow-600');
+                    }
+                    pageContainer.classList.add('hidden');
+                    if (loadMoreBtn) loadMoreBtn.classList.add('hidden');
+                    if (metaEl) metaEl.textContent = '';
+                    return;
+                }
+
+                if (statusEl) {
+                    statusEl.textContent = '';
+                    statusEl.classList.remove('text-yellow-600', 'text-red-500');
+                    statusEl.classList.add('text-gray-500');
+                }
+                pageContainer.classList.remove('hidden');
+
+                pages.forEach(page => {
+                    const card = document.createElement('article');
+                    card.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50';
+
+                    const header = document.createElement('header');
+                    header.className = 'flex items-center justify-between mb-3';
+
+                    const label = document.createElement('span');
+                    label.className = 'text-sm font-semibold text-gray-700';
+                    label.textContent = `Page ${page.number ?? '?'}`;
+
+                    const chars = document.createElement('span');
+                    chars.className = 'text-xs text-gray-400';
+                    chars.textContent = `${page.characters || 0} characters`;
+
+                    header.appendChild(label);
+                    header.appendChild(chars);
+
+                    const body = document.createElement('pre');
+                    body.className = 'whitespace-pre-wrap text-sm leading-relaxed text-gray-800';
+                    const textContent = (page.text || '').trim();
+                    body.textContent = textContent || '[No text detected on this page]';
+
+                    card.appendChild(header);
+                    card.appendChild(body);
+                    pageContainer.appendChild(card);
+
+                    if (typeof page.number === 'number') {
+                        if (parsedPdfState.firstLoaded === null || page.number < parsedPdfState.firstLoaded) {
+                            parsedPdfState.firstLoaded = page.number;
+                        }
+                        if (parsedPdfState.lastLoaded === null || page.number > parsedPdfState.lastLoaded) {
+                            parsedPdfState.lastLoaded = page.number;
+                        }
+                    }
+                });
+
+                if (loadMoreBtn) {
+                    loadMoreBtn.classList.toggle('hidden', !parsedPdfState.nextStart);
+                }
+
+                if (metaEl) {
+                    if (parsedPdfState.firstLoaded !== null && parsedPdfState.lastLoaded !== null) {
+                        const totalTxt = parsedPdfState.totalPages ? parsedPdfState.totalPages : 'unknown';
+                        metaEl.textContent = `Showing pages ${parsedPdfState.firstLoaded}-${parsedPdfState.lastLoaded} of ${totalTxt}`;
+                    } else {
+                        metaEl.textContent = '';
+                    }
+                }
+            } catch (error) {
+                if (statusEl) {
+                    statusEl.textContent = error.message || 'Failed to parse PDF.';
+                    statusEl.classList.remove('text-gray-500', 'text-yellow-600');
+                    statusEl.classList.add('text-red-500');
+                }
+                if (loadMoreBtn) loadMoreBtn.classList.add('hidden');
+            }
+        }
+
+        function loadMoreParsedPdfPages() {
+            if (!parsedPdfState.gId || !parsedPdfState.nextStart) {
+                return;
+            }
+            fetchParsedPdfPages(parsedPdfState.gId, parsedPdfState.nextStart, true);
+        }
+
+        function closeParsedPdfModal() {
+            const modal = document.getElementById('parsedPdfModal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // Listen for master dashboard updates
+        socket.on('master_update', function(data) {
+            console.log('Received update:', data);
+            
+            // Add to activity log
+            addToActivityLog(data.log);
+            
+            // Refresh page to show updated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        });
+
+        function addToActivityLog(logData) {
+            const logContainer = document.getElementById('activity-log');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'flex items-center space-x-3 p-3 bg-gray-50 rounded-lg';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            logEntry.innerHTML = `
+                <div class="flex-shrink-0">
+                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm text-gray-900">${logData.action}</p>
+                    <p class="text-xs text-gray-500">${logData.user_email} • ${timestamp}</p>
+                </div>
+            `;
+            
+            // Add to top of log
+            logContainer.insertBefore(logEntry, logContainer.firstChild);
+            
+            // Keep only last 10 entries
+            while (logContainer.children.length > 10) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        function advance(bidId, toStage) {
+            if (!toStage) {
+                return;
+            }
+            
+            fetch(`/api/update_stage/${bidId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stage: toStage })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message briefly then reload
+                    const notification = document.createElement('div');
+                    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                    notification.textContent = data.success;
+                    document.body.appendChild(notification);
+                    
+                    // Reload page to move bid to next team's dashboard
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating stage');
+            });
+        }
+
+        function showBidSummary(bidId, bidName, company, dueDate, decision, projectStatus, workStatus, description) {
+            // Populate modal with bid data
+            document.getElementById('modalTitle').textContent = `${bidName} - Summary`;
+            document.getElementById('modalCompany').textContent = company;
+            document.getElementById('modalDueDate').textContent = dueDate;
+            document.getElementById('modalDecision').textContent = decision;
+            document.getElementById('modalProjectStatus').textContent = projectStatus;
+            document.getElementById('modalWorkStatus').textContent = workStatus;
+            document.getElementById('modalDescription').textContent = description;
+            
+            // Show modal
+            document.getElementById('bidSummaryModal').classList.remove('hidden');
+        }
+
+        // Read values from data-* attributes to avoid inline argument quoting issues
+        function showBidSummaryFromEl(btn) {
+            const bidId = parseInt(btn.getAttribute('data-bid-id'));
+            const bidName = btn.getAttribute('data-bid-name') || '';
+            const company = btn.getAttribute('data-company') || 'N/A';
+            const dueDate = btn.getAttribute('data-due-date') || 'N/A';
+            const decision = btn.getAttribute('data-decision') || 'GO';
+            const projectStatus = btn.getAttribute('data-project-status') || 'ongoing';
+            const workStatus = btn.getAttribute('data-work-status') || '';
+            const description = btn.getAttribute('data-description') || '';
+            showBidSummary(bidId, bidName, company, dueDate, decision, projectStatus, workStatus, description);
+        }
+
+        function closeBidSummary() {
+            document.getElementById('bidSummaryModal').classList.add('hidden');
+        }
+
+        function viewDetails(bidId) {
+            // For now, just show an alert. You can implement a modal or redirect to a details page
+            alert(`View details for bid ${bidId}`);
+        }
+
+        // Helper function to get next stage
+        function getNextStage(currentStage) {
+            const stageFlow = {
+                'analyzer': 'business',
+                'business': 'design',
+                'design': 'operations',
+                'operations': 'engineer',
+                'engineer': 'handover'
+            };
+            return stageFlow[currentStage] || null;
+        }
+
+        // Manage Timeline modal (supervisor-like), but only allow next stages
+        function showManageTimeline(bidId, currentStage) {
+            const order = ['analyzer','business','design','operations','engineer','handover'];
+            const idx = order.indexOf((currentStage || 'analyzer').toLowerCase());
+            // Prefer dynamic stages from dataset if available
+            let dynStages = [];
+            const row = document.querySelector(`[data-bid-row="${bidId}"]`);
+            if (row) {
+                try { dynStages = JSON.parse(row.getAttribute('data-dyn-stages') || '[]'); } catch(e) { dynStages = []; }
+            }
+            let allowed;
+            if (dynStages && dynStages.length) {
+                const pos = dynStages.indexOf((currentStage || 'analyzer').toLowerCase());
+                allowed = dynStages.slice(Math.max(pos + 1, 0));
+            } else {
+                allowed = order.slice(Math.max(idx + 1, 0));
+            }
+            const modalId = `manageTimelineModal_${bidId}`;
+            let modal = document.getElementById(modalId);
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = modalId;
+                modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white w-96 rounded-lg shadow-xl">
+                        <div class="px-5 py-4 border-b flex items-center justify-between">
+                            <h3 class="text-lg font-semibold">Manage Timeline</h3>
+                            <button class="text-gray-500 hover:text-gray-700" onclick="document.getElementById('${modalId}').remove()">✕</button>
+                        </div>
+                        <div class="p-5 space-y-5">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Add Stage</label>
+                                <div class="flex space-x-2">
+                                    <input id="addStage_${bidId}" type="text" placeholder="Enter new stage (e.g., procurement)" class="flex-1 border rounded px-3 py-2" />
+                                    <button class="px-3 py-2 bg-blue-600 text-white rounded" onclick="applyAddStage(${bidId})">Add</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Move to next stage</label>
+                                <select id="nextStage_${bidId}" class="w-full border rounded px-3 py-2">
+                                    ${allowed.map(s => `<option value="${s}">${s.replace('_',' ').replace(/\b\w/g, c=>c.toUpperCase())}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Delete Stage (after current only)</label>
+                                <div class="flex space-x-2">
+                                    <select id="delStage_${bidId}" class="flex-1 border rounded px-3 py-2">
+                                        ${allowed.map(s => `<option value="${s}">${s.replace('_',' ').replace(/\b\w/g, c=>c.toUpperCase())}</option>`).join('')}
+                                    </select>
+                                    <button class="px-3 py-2 bg-red-600 text-white rounded" onclick="applyDeleteStage(${bidId})">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="px-5 py-4 border-t flex justify-end space-x-2">
+                            <button class="px-4 py-2 bg-gray-200 rounded" onclick="document.getElementById('${modalId}').remove()">Cancel</button>
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded" onclick="applyManageTimeline(${bidId})">Update Stage</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+            }
+        }
+
+        function applyManageTimeline(bidId) {
+            const select = document.getElementById(`nextStage_${bidId}`);
+            if (!select) return;
+            const selected = (select.value || '').toLowerCase();
+            fetch(`/api/update_stage/${bidId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ stage: selected })
+            })
+            .then(async r => { try { return { ok: r.ok, data: await r.json() }; } catch { return { ok: r.ok, data: {} }; } })
+            .then(({ ok, data }) => {
+                if (ok && (data.success || Object.keys(data).length === 0)) {
+                    const modal = document.getElementById(`manageTimelineModal_${bidId}`);
+                    if (modal) modal.remove();
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(() => alert('Error updating stage'));
+        }
+
+        function applyAddStage(bidId) {
+            const inp = document.getElementById(`addStage_${bidId}`);
+            const val = (inp && inp.value || '').trim();
+            if (!val) { alert('Please enter a stage name'); return; }
+            const payload = new URLSearchParams({ g_id: bidId, new_stage: val });
+            // Try team endpoint first
+            fetch('/team/stage/add', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, credentials: 'include', body: payload })
+            .then(async r => { if (r.ok) return { ok: true }; if (r.status === 404 || r.status === 403) return Promise.reject(r); return r.json(); })
+            .then(() => location.reload())
+            .catch(() => {
+                // Fallback to supervisor endpoint (may redirect HTML)
+                fetch('/supervisor/add-stage', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, credentials: 'include', body: payload })
+                .then(r => { if (r.ok) location.reload(); else alert('Error adding stage'); })
+                .catch(() => alert('Error adding stage'));
+            });
+        }
+
+        function applyDeleteStage(bidId) {
+            const sel = document.getElementById(`delStage_${bidId}`);
+            const val = (sel && sel.value) || '';
+            if (!val) { alert('Select a stage to delete'); return; }
+            if (!confirm(`Delete stage "${val}"? This cannot be undone.`)) return;
+            const payload = new URLSearchParams({ g_id: bidId, stage: val });
+            fetch('/team/stage/delete', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, credentials: 'include', body: payload })
+            .then(async r => { if (r.ok) return r.json(); if (r.status === 404 || r.status === 403) return Promise.reject(r); return r.json(); })
+            .then(data => { if (data.ok) location.reload(); else alert('Error: ' + (data.error || 'Unable to delete stage')); })
+            .catch(() => {
+                fetch('/supervisor/delete-stage', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, credentials: 'include', body: payload })
+                .then(r => { if (r.ok) location.reload(); else alert('Error deleting stage'); })
+                .catch(() => alert('Error deleting stage'));
+            });
+        }
+
+        function showTransferModal(bidId, bidName) {
+            document.getElementById('transferBidId').value = bidId;
+            document.getElementById('transferBidName').textContent = bidName;
+            document.getElementById('transferModal').classList.remove('hidden');
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transferModal').classList.add('hidden');
+        }
+
+        function generateProposals(bidId, bidName, company) {
+            // Navigate to proposals-making page with bid information
+            const params = new URLSearchParams({
+                bid_id: bidId,
+                bid_name: bidName,
+                company: company || ''
+            });
+            window.location.href = `/proposals-making?${params.toString()}`;
+        }
+
+        // Add event listeners for generate proposals buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.generate-proposals-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const bidId = this.getAttribute('data-bid-id');
+                    const bidName = this.getAttribute('data-bid-name');
+                    const company = this.getAttribute('data-bid-company');
+                    generateProposals(bidId, bidName, company);
+                });
+            });
+        });
+
+        function submitTransfer() {
+            const form = document.getElementById('transferForm');
+            const formData = new FormData(form);
+            
+            fetch('/team/{{ team }}/transfer_project', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Error transferring project');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error transferring project');
+            });
+        }
+
+        let currentBidId = null;
+        let teamEmployees = [];
+
+        // Load team employees on page load and compute progress bars
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTeamEmployees();
+            loadAllBidProgress();
+            // After employees load, render planner-like assignee controls
+            setTimeout(renderAssigneeControls, 300);
+            // Grid/Board toggle
+            const tabGrid = document.getElementById('tabGrid');
+            const tabBoard = document.getElementById('tabBoard');
+            const headerBoardBtn = document.getElementById('headerBoardBtn');
+            const grid = document.getElementById('gridContainer');
+            const board = document.getElementById('boardContainer');
+            if (tabGrid && tabBoard && grid && board) {
+                tabGrid.addEventListener('click', () => { grid.classList.remove('hidden'); board.classList.add('hidden'); });
+                tabBoard.addEventListener('click', () => { board.classList.remove('hidden'); grid.classList.add('hidden'); });
+            }
+            if (headerBoardBtn && grid && board) {
+                headerBoardBtn.addEventListener('click', () => {
+                    // Show board view and scroll into view
+                    board.classList.remove('hidden');
+                    grid.classList.add('hidden');
+                    board.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            }
+            // Bucket filter for board
+            const bucketFilter = document.getElementById('boardBucketFilter');
+            if (bucketFilter) {
+                bucketFilter.addEventListener('change', function() {
+                    const val = this.value || '__all__';
+                    document.querySelectorAll('[data-board-column]').forEach(col => {
+                        const k = col.getAttribute('data-board-column');
+                        if (val === '__all__' || val === k) col.classList.remove('hidden'); else col.classList.add('hidden');
+                    });
+                    renderBoard(currentGroupBy, val);
+                });
+            }
+            // Group by menu
+            const groupBtn = document.getElementById('groupByBtn');
+            const groupMenu = document.getElementById('groupByMenu');
+            const groupLabel = document.getElementById('groupByLabel');
+            if (groupBtn && groupMenu) {
+                groupBtn.addEventListener('click', () => groupMenu.classList.toggle('hidden'));
+                groupMenu.querySelectorAll('[data-group]').forEach(it => {
+                    it.addEventListener('click', () => {
+                        currentGroupBy = it.getAttribute('data-group');
+                        groupLabel.textContent = currentGroupBy === 'assignee' ? 'Assigned to' : 'Bucket';
+                        groupMenu.classList.add('hidden');
+                        const currentFilter = (document.getElementById('boardBucketFilter')?.value) || '__all__';
+                        renderBoard(currentGroupBy, currentFilter);
+                    });
+                });
+            }
+            // Initial board render
+            renderBoard(currentGroupBy, '__all__');
+        });
+
+        function loadAllBidProgress() {
+            bidIds.forEach(id => loadBidProgress(id));
+        }
+
+        function loadBidProgress(bidId) {
+            fetch(`/api/team/{{ team }}/bids/${bidId}/tasks`)
+                .then(response => response.json())
+                .then(data => {
+                    const tasks = data.tasks || [];
+                    let pct = 0;
+                    if (tasks.length > 0) {
+                        const completed = tasks.filter(t => t.status === 'completed').length;
+                        pct = Math.round((completed / tasks.length) * 100);
+                    }
+                    // Keep actual pct based on tasks for this team only
+                    const bar = document.getElementById(`progressBarRow_${bidId}`);
+                    const txt = document.getElementById(`progressPctRow_${bidId}`);
+                    if (bar) bar.style.width = `${pct}%`;
+                    if (txt) txt.textContent = `${pct}%`;
+                    const boardTxt = document.getElementById(`boardPct_${bidId}`);
+                    if (boardTxt) boardTxt.textContent = `${pct}%`;
+                    // Set bucket label independently based on pct
+                    const lbl = document.getElementById(`bucketLabel_${bidId}`);
+                    if (lbl) {
+                        let text, cls;
+                        if (pct >= 100) { text = 'Completed'; cls = 'bg-emerald-100 text-emerald-700 border border-emerald-200'; }
+                        else if (pct > 0) { text = 'In Progress'; cls = 'bg-amber-100 text-amber-700 border border-amber-200'; }
+                        else { text = 'Ready To Start'; cls = 'bg-indigo-100 text-indigo-700 border border-indigo-200'; }
+                        lbl.textContent = text;
+                        lbl.className = `px-2 py-1 rounded-full text-xs ${cls}`;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading bid progress', bidId, err);
+                });
+        }
+
+        // --- Board rendering ---
+        let currentGroupBy = 'bucket';
+        const stageDisplay = {
+            analyzer: 'Planned / Ready to Start',
+            business: 'Idea / Backlog',
+            design: 'In Progress',
+            operations: 'Under Review / QA',
+            engineer: 'On Hold / Blocked',
+            handover: 'Submitted'
+        };
+        const stageIcon = {
+            analyzer: 'fa-clipboard-list text-amber-400',
+            business: 'fa-lightbulb text-pink-400',
+            design: 'fa-hourglass-half text-yellow-400',
+            operations: 'fa-vial text-blue-400',
+            engineer: 'fa-circle-pause text-rose-400',
+            handover: 'fa-check-double text-emerald-400'
+        };
+
+        async function getBidPct(bidId) {
+            try {
+                const r = await fetch(`/api/team/{{ team }}/bids/${bidId}/tasks`);
+                const d = await r.json();
+                const tasks = d.tasks || [];
+                if (!tasks.length) return 0;
+                const completed = tasks.filter(t => (t.status||'').toLowerCase()==='completed').length;
+                return Math.round((completed / tasks.length) * 100);
+            } catch { return 0; }
+        }
+
+        async function renderBoard(groupBy, bucketFilterVal) {
+            const container = document.getElementById('boardColumns');
+            if (!container) return;
+            container.innerHTML = '';
+            let columns = [];
+            if (groupBy === 'assignee') {
+                const names = Array.from(new Set((bidsData || []).map(b => (b.person_name || 'Unassigned')))).sort((a,b)=>a.localeCompare(b));
+                columns = names.map(n => ({ key: n, label: n, icon: 'fa-user text-blue-300' }));
+            } else {
+                // Bucket-based columns (Ready, In Progress, Completed)
+                columns = [
+                    { key: 'ready', label: 'Planned / Ready to Start', icon: 'fa-lock text-amber-300' },
+                    { key: 'inprogress', label: 'In Progress', icon: 'fa-hourglass-half text-yellow-300' },
+                    { key: 'completed', label: 'Completed (This Month)', icon: 'fa-check-double text-emerald-300' },
+                ];
+            }
+
+            columns.forEach(col => {
+                const colDiv = document.createElement('div');
+                colDiv.className = 'bg-white rounded border border-gray-200 shadow-sm min-w-[360px]';
+                colDiv.setAttribute('data-board-column', col.key);
+                colDiv.innerHTML = `
+                    <div class="px-3 py-2 border-b border-gray-200 bg-gray-50 text-gray-700 flex items-center gap-2 text-sm">
+                        <i class="fa-solid ${col.icon}"></i>
+                        <span class="font-semibold">${col.label}</span>
+                    </div>
+                    <div class="p-3 space-y-3" data-cards></div>
+                `;
+                container.appendChild(colDiv);
+            });
+
+            const thisTeam = '{{ team }}'.toLowerCase();
+            for (const bid of (bidsData || [])) {
+                let colKey;
+                if (groupBy === 'assignee') {
+                    colKey = (bid.person_name || 'Unassigned');
+                } else {
+                    const pct = await getBidPct(bid.id);
+                    if (pct >= 100) colKey = 'completed';
+                    else if (pct > 0) colKey = 'inprogress';
+                    else colKey = 'ready';
+                    if (bucketFilterVal && bucketFilterVal !== '__all__' && colKey !== bucketFilterVal) continue;
+                }
+                const targetCol = Array.from(document.querySelectorAll('[data-board-column]')).find(c => c.getAttribute('data-board-column') === colKey);
+                if (!targetCol) continue;
+                const cards = targetCol.querySelector('[data-cards]');
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded border border-gray-200 p-3 shadow-sm';
+                const due = bid.due_date || '';
+                const company = bid.company || '';
+                const summary = bid.summary || '';
+                // If we already computed pct, use it; otherwise show 0 and update later
+                let pctTxt = '0%';
+                if (typeof colKey === 'string' && (colKey==='completed' || colKey==='inprogress' || colKey==='ready')) {
+                    if (colKey==='completed') pctTxt = '100%'; else if (colKey==='inprogress') pctTxt = '';
+                }
+                card.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div class="font-semibold text-sm text-gray-900">${bid.name || ''}</div>
+                        <div class="text-[11px] text-gray-500">${due}</div>
+                    </div>
+                    ${summary ? `<div class=\"text-xs text-gray-600 mt-1 line-clamp-2\">${summary}</div>` : ''}
+                    <div class="mt-2 flex items-center justify-between text-[11px] text-gray-600">
+                        <div class="flex items-center gap-2">${company ? `<span class=\"px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200\">${company}</span>` : ''}</div>
+                        <div class="flex items-center gap-2"><i class="fa-regular fa-circle-check text-emerald-500"></i><span id="boardPct_${bid.id}">${pctTxt}</span></div>
+                    </div>
+                `;
+                card.addEventListener('click', () => openBoardBidModal(bid));
+                cards.appendChild(card);
+            }
+        }
+
+        function loadTeamEmployees() {
+            fetch(`/api/team/{{ team }}/employees`)
+            .then(response => response.json())
+            .then(data => {
+                teamEmployees = data.employees || [];
+                populateEmployeeSelect();
+            })
+            .catch(error => {
+                console.error('Error loading employees:', error);
+            });
+        }
+
+        function populateEmployeeSelect() {
+            const select = document.getElementById('assigned_to');
+            select.innerHTML = '<option value="">Select Employee</option>';
+            teamEmployees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.id;
+                option.textContent = employee.name;
+                select.appendChild(option);
+            });
+        }
+
+        // --- Planner-style assignees UI ---
+        function getInitials(name){
+            if(!name) return 'U';
+            const parts = name.trim().split(/\s+/);
+            return (parts[0]?.[0]||'U') + (parts[1]?.[0]||'');
+        }
+        function renderAssigneeControls(){
+            document.querySelectorAll('[data-assignees]').forEach(host => {
+                const bidId = parseInt(host.getAttribute('data-bid-id'));
+                const bid = (bidsData||[]).find(b => b.id === bidId) || {};
+                const members = bid.assigned_members || [];
+                host.innerHTML = '';
+                if (!members.length){
+                    const empty = document.createElement('div');
+                    empty.className = 'text-[11px] text-gray-500';
+                    empty.textContent = 'Unassigned';
+                    host.appendChild(empty);
+                } else {
+                    members.forEach(m => host.appendChild(buildAssigneeChip(bidId, m)));
+                }
+            });
+            document.querySelectorAll('[data-assignees-btn]').forEach(btn => {
+                btn.onclick = () => openAssigneeMenu(parseInt(btn.getAttribute('data-bid-id')), btn);
+            });
+        }
+        function buildAssigneeChip(bidId, member){
+            const chip = document.createElement('span');
+            chip.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 text-xs border';
+            chip.innerHTML = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px]">${getInitials(member.name)}</span><span>${member.name}</span><button type="button" class="ml-1 text-gray-500 hover:text-gray-700" aria-label="Remove">×</button>`;
+            chip.querySelector('button').onclick = () => {
+                const current = getMemberIds(bidId).filter(id => id !== member.id);
+                saveAssignees(bidId, current);
+            };
+            return chip;
+        }
+        function getMemberIds(bidId){
+            const bid = (bidsData||[]).find(b => b.id === bidId) || {};
+            return (bid.assigned_members||[]).map(m => m.id);
+        }
+        function openAssigneeMenu(bidId, anchor){
+            closeAssigneeMenu();
+            const menu = document.createElement('div');
+            menu.id = 'assigneeMenu';
+            menu.className = 'absolute z-50 bg-white border rounded shadow-lg p-2 text-sm';
+            const rect = anchor.getBoundingClientRect();
+            menu.style.top = (window.scrollY + rect.bottom + 6) + 'px';
+            menu.style.left = (window.scrollX + rect.left) + 'px';
+            const selected = new Set(getMemberIds(bidId));
+            const list = document.createElement('div');
+            list.className = 'max-h-56 overflow-auto min-w-[220px]';
+            (teamEmployees||[]).forEach(emp => {
+                const row = document.createElement('label');
+                row.className = 'flex items-center gap-2 px-2 py-1 hover:bg-gray-50 cursor-pointer';
+                const cb = document.createElement('input'); cb.type='checkbox'; cb.value = emp.id; cb.checked = selected.has(emp.id);
+                row.appendChild(cb);
+                const av = document.createElement('span'); av.className='inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px]'; av.textContent=getInitials(emp.name);
+                row.appendChild(av);
+                const txt = document.createElement('span'); txt.textContent = `${emp.name} (${emp.email})`; row.appendChild(txt);
+                list.appendChild(row);
+            });
+            const actions = document.createElement('div');
+            actions.className = 'flex justify-end gap-2 mt-2';
+            const btnCancel = document.createElement('button'); btnCancel.className='px-2 py-1 text-xs rounded bg-gray-200'; btnCancel.textContent='Cancel';
+            const btnSave = document.createElement('button'); btnSave.className='px-2 py-1 text-xs rounded bg-blue-600 text-white'; btnSave.textContent='Save';
+            btnCancel.onclick = closeAssigneeMenu;
+            btnSave.onclick = () => {
+                const ids = Array.from(list.querySelectorAll('input[type="checkbox"]:checked')).map(i=>parseInt(i.value));
+                saveAssignees(bidId, ids);
+                closeAssigneeMenu();
+            };
+            menu.appendChild(list); menu.appendChild(actions); actions.appendChild(btnCancel); actions.appendChild(btnSave);
+            document.body.appendChild(menu);
+            setTimeout(()=> document.addEventListener('click', outsideCloseOnce), 0);
+            function outsideCloseOnce(e){ if (!menu.contains(e.target) && e.target !== anchor){ closeAssigneeMenu(); document.removeEventListener('click', outsideCloseOnce);} }
+        }
+        function closeAssigneeMenu(){ const m = document.getElementById('assigneeMenu'); if (m) m.remove(); }
+        function saveAssignees(bidId, ids){
+            fetch(`/api/team/{{ team }}/assign`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ g_id: bidId, employee_ids: ids }) })
+                .then(r=>r.json())
+                .then(d=>{
+                    if (!d.ok) { alert(d.error || 'Assignment failed'); return; }
+                    // Update local data model
+                    const bidIdx = (bidsData||[]).findIndex(b => b.id === bidId);
+                    if (bidIdx >= 0){
+                        const map = new Map((teamEmployees||[]).map(e => [e.id, e]));
+                        bidsData[bidIdx].assigned_members = (ids||[]).map(id => ({ id, name: map.get(id)?.name || 'User', email: map.get(id)?.email || '' }));
+                    }
+                    // Re-render chips
+                    const host = document.querySelector(`[data-assignees][data-bid-id="${bidId}"]`);
+                    if (host) {
+                        host.innerHTML = '';
+                        const bid = (bidsData||[]).find(b => b.id === bidId) || {};
+                        (bid.assigned_members||[]).forEach(m => host.appendChild(buildAssigneeChip(bidId, m)));
+                        if (!(bid.assigned_members||[]).length){ const empty=document.createElement('div'); empty.className='text-[11px] text-gray-500'; empty.textContent='Unassigned'; host.appendChild(empty); }
+                    }
+                })
+                .catch(()=> alert('Assignment failed'));
+        }
+
+        
+
+        function showChecklistSection(bidId, bidName) {
+            currentBidId = bidId;
+            document.getElementById('selectedBidId').value = bidId;
+            document.getElementById('selectedBidName').textContent = bidName;
+            document.getElementById('checklistBidName').textContent = bidName;
+            
+            // Show both sections
+            document.getElementById('addTaskSection').classList.remove('hidden');
+            document.getElementById('taskChecklistSection').classList.remove('hidden');
+            
+            // Load existing tasks for this bid
+            loadBidTasks(bidId);
+        }
+
+        function hideChecklistSection() {
+            document.getElementById('addTaskSection').classList.add('hidden');
+            document.getElementById('taskChecklistSection').classList.add('hidden');
+            currentBidId = null;
+        }
+
+        // Inline bucket change (Planner style)
+        function changeBucket(bidId, toStage) {
+            if (!toStage) return;
+            advance(bidId, toStage);
+        }
+
+        function toggleBucketMenu(bidId) {
+            const m = document.getElementById(`bucketMenu_${bidId}`);
+            if (!m) return;
+            // Close others
+            document.querySelectorAll('.bucket-menu').forEach(el => { if (el !== m) el.classList.add('hidden'); });
+            m.classList.toggle('hidden');
+        }
+
+        function selectBucket(bidId, stage, label, iconClass) {
+            changeBucket(bidId, stage);
+            const btn = document.getElementById(`bucketBtn_${bidId}`);
+            if (btn) {
+                const lab = btn.querySelector('[data-label]');
+                const ic = btn.querySelector('i[data-icon]');
+                if (lab) lab.textContent = label;
+                if (ic) ic.className = `fa-solid ${iconClass}`;
+            }
+            const m = document.getElementById(`bucketMenu_${bidId}`);
+            if (m) m.classList.add('hidden');
+        }
+
+        // Close bucket menus when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('[data-bucket]')) {
+                document.querySelectorAll('.bucket-menu').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        function loadBidTasks(bidId) {
+            fetch(`/api/team/{{ team }}/bids/${bidId}/tasks`)
+            .then(response => response.json())
+            .then(data => {
+                populateTaskTable(data.tasks || []);
+                updateProgressBar(data.tasks || []);
+            })
+            .catch(error => {
+                console.error('Error loading tasks:', error);
+            });
+        }
+
+        function populateTaskTable(tasks) {
+            const tbody = document.getElementById('taskChecklistTableBody');
+            tbody.innerHTML = '';
+            
+            if (tasks.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-6 text-center text-gray-500">
+                            <i class="fas fa-tasks text-4xl text-gray-300 mb-2"></i>
+                            <p>No tasks created yet for this bid</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tasks.forEach(task => {
+                const row = document.createElement('tr');
+                row.className = 'border-b hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="p-3">
+                        <div>
+                            <div class="font-medium">${task.task_name}</div>
+                            ${task.description ? `<div class="text-sm text-gray-600">${task.description}</div>` : ''}
+                        </div>
+                    </td>
+                    <td class="p-3">${task.assigned_employee_name || 'Unassigned'}</td>
+                    <td class="p-3">${task.employee_email || 'N/A'}</td>
+                    <td class="p-3">${task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A'}</td>
+                    <td class="p-3">${task.department || 'N/A'}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-1 text-xs rounded-full ${getStatusClass(task.status)}">
+                            ${task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                        </span>
+                    </td>
+                    <td class="p-3">
+                        <div class="flex space-x-2">
+                            <button class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                                    onclick="openTaskEdit(${task.id}, '${task.task_name}', '${(task.description||'').replace(/'/g, "\'")}', '${task.status}', '${task.due_date || ''}', '${task.priority || 'medium'}')">
+                                Update
+                            </button>
+                            <button class="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                                    onclick="deleteTask(${task.id})">
+                                Delete
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case 'completed': return 'bg-green-100 text-green-800';
+                case 'in_progress': return 'bg-blue-100 text-blue-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        function updateProgressBar(tasks) {
+            if (tasks.length === 0) {
+                document.getElementById('progressBar').style.width = '0%';
+                document.getElementById('progressPercentage').textContent = '0%';
+                return;
+            }
+
+            const completedTasks = tasks.filter(task => task.status === 'completed').length;
+            const progressPercentage = Math.round((completedTasks / tasks.length) * 100);
+            
+            document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+            document.getElementById('progressPercentage').textContent = `${progressPercentage}%`;
+        }
+
+        function updateTaskStatus(taskId, newStatus) {
+            const formData = new FormData();
+            formData.append('status', newStatus);
+            
+            fetch(`/task/${taskId}/update_status`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload tasks for current bid
+                    if (currentBidId) {
+                        loadBidTasks(currentBidId);
+                    }
+                } else {
+                    alert('Error updating task status: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating task status');
+            });
+        }
+
+        function deleteTask(taskId) {
+            if (!confirm('Delete this task?')) return;
+            fetch(`/task/${taskId}/delete`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        if (currentBidId) loadBidTasks(currentBidId);
+                    } else {
+                        alert('Error deleting task: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error deleting task');
+                });
+        }
+
+        function openTaskEdit(taskId, taskName, description, status, dueDate, priority) {
+            const newName = prompt('Task name:', taskName);
+            if (newName === null) return;
+            const newDesc = prompt('Description:', description || '');
+            if (newDesc === null) return;
+            const newStatus = prompt("Status (pending|in_progress|completed):", status);
+            if (newStatus === null) return;
+            const newDue = prompt('Due date (YYYY-MM-DD HH:MM) or empty:', dueDate || '');
+            if (newDue === null) return;
+            const newPriority = prompt('Priority (low|medium|high|urgent):', priority || 'medium');
+            if (newPriority === null) return;
+
+            const form = new FormData();
+            form.append('task_name', newName);
+            form.append('description', newDesc);
+            form.append('status', newStatus);
+            if (newDue) form.append('due_date', newDue);
+            form.append('priority', newPriority);
+
+            fetch(`/task/${taskId}/update`, { method: 'POST', body: form })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        if (currentBidId) loadBidTasks(currentBidId);
+                    } else {
+                        alert('Error updating task: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error updating task');
+                });
+        }
+
+        function showTaskDetails(taskId, taskName, description, status) {
+            alert(`Task: ${taskName}\nDescription: ${description}\nStatus: ${status}`);
+        }
+
+        // Handle add task form submission
+        document.getElementById('addTaskForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            fetch(`/team/{{ team }}/bids/${currentBidId}/checklist/create`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Clear form
+                    this.reset();
+                    // Reload tasks
+                    loadBidTasks(currentBidId);
+                } else {
+                    alert('Error creating task');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error creating task');
+            });
+        });
+
+        // --- Planner-like Bid modal helpers ---
+        let bbmCurrentBidId = null;
+        function openBoardBidModal(bid) {
+            bbmCurrentBidId = bid.id;
+            // Get the latest bid data from bidsData to ensure we have assigned_members
+            const latestBid = (bidsData||[]).find(b => b.id === bid.id) || bid;
+            document.getElementById('boardBidModal').classList.remove('hidden');
+            document.getElementById('bbm_plan').textContent = `Team – ${'{{ team_display_name }}'}`;
+            document.getElementById('bbm_title').textContent = latestBid.name || '';
+            const labDiv = document.getElementById('bbm_labels');
+            labDiv.innerHTML = '';
+            if (latestBid.company) {
+                const span = document.createElement('span');
+                span.className = 'px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs border border-purple-200';
+                span.textContent = latestBid.company;
+                labDiv.appendChild(span);
+            }
+            // Load and display assigned team members
+            loadModalTeamAssignees(latestBid);
+            // Bucket selector
+            const bucketHost = document.getElementById('bbm_bucket');
+            bucketHost.innerHTML = '';
+            const stages = (latestBid.dyn_stages || ['analyzer','business','design','operations','engineer','handover']);
+            const sel = document.createElement('select');
+            sel.className = 'w-full border rounded px-3 py-2 text-sm';
+            stages.forEach(s=>{
+                const opt = document.createElement('option');
+                opt.value = s; opt.textContent = s.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
+                if ((latestBid.current_stage||'analyzer')===s) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            sel.addEventListener('change', ()=> changeBucket(latestBid.id, sel.value));
+            bucketHost.appendChild(sel);
+            // Dates and notes
+            try{ document.getElementById('bbm_start').value = (latestBid.in_date || '').substring(0,10);}catch{}
+            try{ document.getElementById('bbm_due').value = (latestBid.due_date || '').substring(0,10);}catch{}
+            // enable date editing
+            const startEl = document.getElementById('bbm_start');
+            const dueEl = document.getElementById('bbm_due');
+            startEl.disabled = false; dueEl.disabled = false;
+            const saveDates = ()=>{
+                const fd = new FormData();
+                if (startEl.value) fd.append('in_date', startEl.value);
+                if (dueEl.value) fd.append('due_date', dueEl.value);
+                fetch(`/api/bids/${latestBid.id}/dates`, { method:'POST', body: fd}).then(()=>{});
+            };
+            startEl.onchange = saveDates; dueEl.onchange = saveDates;
+            document.getElementById('bbm_notes').value = latestBid.summary || '';
+            document.getElementById('bbm_save_notes').onclick = function(){
+                const fd = new FormData();
+                fd.append('summary', document.getElementById('bbm_notes').value || '');
+                fetch(`/api/bids/${latestBid.id}/summary`, { method: 'POST', body: fd })
+                    .then(r=>r.json()).then(()=>{ /* ok */ })
+                    .catch(()=>alert('Could not save notes'));
+            };
+            // Checklist
+            loadBoardChecklist(latestBid.id);
+            const addForm = document.getElementById('bbm_add_task');
+            // Populate assignment select
+            const assignSel = document.getElementById('bbm_assign_to');
+            if (assignSel) {
+                assignSel.innerHTML = '<option value="">Assign to…</option>';
+                (teamEmployees||[]).forEach(emp => {
+                    const opt = document.createElement('option');
+                    opt.value = emp.id;
+                    opt.textContent = `${emp.name} (${emp.email})`;
+                    if ((latestBid.person_email||'').toLowerCase() === (emp.email||'').toLowerCase()) opt.selected = true;
+                    assignSel.appendChild(opt);
+                });
+            }
+            addForm.onsubmit = function(e){
+                e.preventDefault();
+                const name = (document.getElementById('bbm_new_task').value||'').trim();
+                const due = document.getElementById('bbm_new_due').value || '';
+                const assigneeId = (document.getElementById('bbm_assign_to')?.value)||'';
+                if (!name) return;
+                const fd = new FormData();
+                fd.append('g_id', latestBid.id);
+                fd.append('task_name', name);
+                if (due) fd.append('due_date', due);
+                if (assigneeId) fd.append('assigned_to', assigneeId);
+                fetch(`/team/{{ team }}/bids/${latestBid.id}/checklist/create`, { method: 'POST', body: fd })
+                    .then(r=>{ if(r.ok){ document.getElementById('bbm_new_task').value=''; document.getElementById('bbm_new_due').value=''; loadBoardChecklist(latestBid.id);} else alert('Error adding task');});
+            };
+            document.getElementById('bbm_attach_btn').onclick = ()=> document.getElementById('bbm_attach_file').click();
+            document.getElementById('bbm_attach_file').onchange = function(){
+                const file = this.files && this.files[0];
+                if (!file) return;
+                const fd = new FormData();
+                fd.append('g_id', latestBid.id);
+                fd.append('task_name', file.name);
+                fd.append('attachment', file);
+                fetch(`/team/{{ team }}/bids/${latestBid.id}/checklist/create`, { method: 'POST', body: fd })
+                    .then(r=>{ if(r.ok){ this.value=''; loadBoardChecklist(latestBid.id);} else alert('Upload failed'); });
+            };
+            // Setup team assignment button
+            document.getElementById('bbm_assign_team_btn').onclick = () => openModalAssigneeMenu(latestBid.id, document.getElementById('bbm_assign_team_btn'));
+        }
+        
+        function loadModalTeamAssignees(bid) {
+            const host = document.getElementById('bbm_team_assignees');
+            host.innerHTML = '';
+            const members = bid.assigned_members || [];
+            if (!members.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500';
+                empty.textContent = 'No team members assigned';
+                host.appendChild(empty);
+            } else {
+                members.forEach(m => {
+                    const chip = buildModalAssigneeChip(bid.id, m);
+                    host.appendChild(chip);
+                });
+            }
+        }
+        
+        function buildModalAssigneeChip(bidId, member) {
+            const chip = document.createElement('span');
+            chip.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-800 text-xs border';
+            chip.innerHTML = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px]">${getInitials(member.name)}</span><span>${member.name}</span><button type="button" class="ml-1 text-gray-500 hover:text-gray-700" aria-label="Remove">×</button>`;
+            chip.querySelector('button').onclick = () => {
+                const current = getModalMemberIds(bidId).filter(id => id !== member.id);
+                saveModalAssignees(bidId, current);
+            };
+            return chip;
+        }
+        
+        function getModalMemberIds(bidId) {
+            const bid = (bidsData||[]).find(b => b.id === bidId) || {};
+            return (bid.assigned_members||[]).map(m => m.id);
+        }
+        
+        function openModalAssigneeMenu(bidId, anchor) {
+            closeAssigneeMenu();
+            const menu = document.createElement('div');
+            menu.id = 'assigneeMenu';
+            menu.className = 'absolute z-50 bg-white border rounded shadow-lg p-2 text-sm';
+            const rect = anchor.getBoundingClientRect();
+            menu.style.top = (window.scrollY + rect.bottom + 6) + 'px';
+            menu.style.left = (window.scrollX + rect.left) + 'px';
+            const selected = new Set(getModalMemberIds(bidId));
+            const list = document.createElement('div');
+            list.className = 'max-h-56 overflow-auto min-w-[220px]';
+            (teamEmployees||[]).forEach(emp => {
+                const row = document.createElement('label');
+                row.className = 'flex items-center gap-2 px-2 py-1 hover:bg-gray-50 cursor-pointer';
+                const cb = document.createElement('input'); cb.type='checkbox'; cb.value = emp.id; cb.checked = selected.has(emp.id);
+                row.appendChild(cb);
+                const av = document.createElement('span'); av.className='inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px]'; av.textContent=getInitials(emp.name);
+                row.appendChild(av);
+                const txt = document.createElement('span'); txt.textContent = `${emp.name} (${emp.email})`; row.appendChild(txt);
+                list.appendChild(row);
+            });
+            const actions = document.createElement('div');
+            actions.className = 'flex justify-end gap-2 mt-2';
+            const btnCancel = document.createElement('button'); btnCancel.className='px-2 py-1 text-xs rounded bg-gray-200'; btnCancel.textContent='Cancel';
+            const btnSave = document.createElement('button'); btnSave.className='px-2 py-1 text-xs rounded bg-blue-600 text-white'; btnSave.textContent='Save';
+            btnCancel.onclick = closeAssigneeMenu;
+            btnSave.onclick = () => {
+                const ids = Array.from(list.querySelectorAll('input[type="checkbox"]:checked')).map(i=>parseInt(i.value));
+                saveModalAssignees(bidId, ids);
+                closeAssigneeMenu();
+            };
+            menu.appendChild(list); menu.appendChild(actions); actions.appendChild(btnCancel); actions.appendChild(btnSave);
+            document.body.appendChild(menu);
+            setTimeout(()=> document.addEventListener('click', outsideCloseOnce), 0);
+            function outsideCloseOnce(e){ if (!menu.contains(e.target) && e.target !== anchor){ closeAssigneeMenu(); document.removeEventListener('click', outsideCloseOnce);} }
+        }
+        
+        function saveModalAssignees(bidId, ids) {
+            fetch(`/api/team/{{ team }}/assign`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ g_id: bidId, employee_ids: ids }) })
+                .then(r=>r.json())
+                .then(d=>{
+                    if (!d.ok) { alert(d.error || 'Assignment failed'); return; }
+                    // Update local data model
+                    const bidIdx = (bidsData||[]).findIndex(b => b.id === bidId);
+                    if (bidIdx >= 0){
+                        const map = new Map((teamEmployees||[]).map(e => [e.id, e]));
+                        bidsData[bidIdx].assigned_members = (ids||[]).map(id => ({ id, name: map.get(id)?.name || 'User', email: map.get(id)?.email || '' }));
+                    }
+                    // Re-render modal chips
+                    const bid = (bidsData||[]).find(b => b.id === bidId) || {};
+                    loadModalTeamAssignees(bid);
+                    // Also update the table view if visible
+                    const host = document.querySelector(`[data-assignees][data-bid-id="${bidId}"]`);
+                    if (host) {
+                        host.innerHTML = '';
+                        (bid.assigned_members||[]).forEach(m => host.appendChild(buildAssigneeChip(bidId, m)));
+                        if (!(bid.assigned_members||[]).length){ const empty=document.createElement('div'); empty.className='text-[11px] text-gray-500'; empty.textContent='Unassigned'; host.appendChild(empty); }
+                    }
+                })
+                .catch(()=> alert('Assignment failed'));
+        }
+        function closeBoardBidModal(){ document.getElementById('boardBidModal').classList.add('hidden'); }
+        function loadBoardChecklist(bidId){
+            fetch(`/api/team/{{ team }}/bids/${bidId}/tasks`).then(r=>r.json()).then(data=>{
+                const list = document.getElementById('bbm_checklist');
+                list.innerHTML='';
+                const tasks = data.tasks||[];
+                const done = tasks.filter(t=> (t.status||'').toLowerCase()==='completed').length;
+                document.getElementById('bbm_check_counts').textContent = `${done} / ${tasks.length}`;
+                tasks.forEach(t=>{
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center justify-between px-3 py-2';
+                    row.innerHTML = `
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input type="checkbox" ${((t.status||'').toLowerCase()==='completed')?'checked':''}>
+                            <span>${t.task_name||''}</span>
+                            ${t.assigned_employee_name ? `<span class=\"px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[11px]\">${t.assigned_employee_name}</span>` : ''}
+                        </label>
+                        <div class="flex items-center gap-2 text-xs">
+                            ${t.due_date ? `<span class=\"text-gray-500\">${new Date(t.due_date).toLocaleDateString()}</span>` : ''}
+                            <button class="px-2 py-1 rounded bg-blue-600 text-white" data-act="update">Update</button>
+                            <button class="px-2 py-1 rounded bg-gray-700 text-white" data-act="attach">Attach</button>
+                            <button class="px-2 py-1 rounded bg-red-600 text-white" data-act="delete">Delete</button>
+                        </div>`;
+                    const cb = row.querySelector('input[type="checkbox"]');
+                    cb.addEventListener('change', ()=>{
+                        const st = cb.checked ? 'completed' : 'pending';
+                        const fd = new FormData(); fd.append('status', st);
+                        fetch(`/task/${t.id}/update_status`, { method:'POST', body: fd }).then(()=> loadBoardChecklist(bidId));
+                    });
+                    row.querySelector('[data-act="delete"]').addEventListener('click', ()=>{
+                        if(!confirm('Delete task?')) return;
+                        fetch(`/task/${t.id}/delete`, { method:'POST' }).then(()=> loadBoardChecklist(bidId));
+                    });
+                    row.querySelector('[data-act="update"]').addEventListener('click', ()=>{
+                        openTaskEdit(t.id, t.task_name || '', t.description || '', (t.status||''), t.due_date || '', t.priority || 'medium');
+                    });
+                    row.querySelector('[data-act="attach"]').addEventListener('click', ()=>{
+                        const input = document.createElement('input'); input.type='file'; input.className='hidden';
+                        input.onchange = function(){ const f=this.files&&this.files[0]; if(!f) return; const fd=new FormData(); fd.append('attachment',f); fetch(`/task/${t.id}/attach`,{method:'POST',body:fd}).then(()=> loadBoardChecklist(bidId)); };
+                        document.body.appendChild(input); input.click(); setTimeout(()=>input.remove(),1000);
+                    });
+                    list.appendChild(row);
+                });
+            });
+            // Comments
+            loadBoardComments(bidId);
+        }
+
+        function loadBoardComments(bidId){
+            const wrapId = 'bbm_comments_wrap';
+            let wrap = document.getElementById(wrapId);
+            if (!wrap) {
+                // create container below attachments
+                const modal = document.getElementById('boardBidModal').querySelector('.p-5.space-y-5');
+                wrap = document.createElement('div'); wrap.id = wrapId;
+                wrap.innerHTML = `
+                    <label class="block text-sm font-medium text-gray-700">Comments</label>
+                    <div id="bbm_comments" class="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded p-2 bg-gray-50"></div>
+                    <form id="bbm_comment_form" class="mt-2 flex gap-2">
+                        <input id="bbm_comment_input" type="text" class="flex-1 border rounded px-3 py-2 text-sm" placeholder="Type your message here">
+                        <button class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Send</button>
+                    </form>`;
+                modal.appendChild(wrap);
+            }
+            fetch(`/api/bids/${bidId}/comments`).then(r=>r.json()).then(data=>{
+                const list = document.getElementById('bbm_comments');
+                list.innerHTML = '';
+                (data.comments||[]).forEach(c=>{
+                    const row = document.createElement('div');
+                    row.className = 'text-xs text-gray-700 bg-white border rounded px-2 py-1';
+                    row.innerHTML = `<span class="font-medium">${c.user_email||'User'}</span> · <span class="text-gray-500">${(c.created_at||'').toString().replace('T',' ').substring(0,19)}</span><div>${c.comment_text||''}</div>`;
+                    list.appendChild(row);
+                });
+                const form = document.getElementById('bbm_comment_form');
+                form.onsubmit = function(e){
+                    e.preventDefault();
+                    const val = (document.getElementById('bbm_comment_input').value||'').trim();
+                    if (!val) return;
+                    const fd = new FormData(); fd.append('comment', val);
+                    fetch(`/api/bids/${bidId}/comments`, { method:'POST', body: fd}).then(()=>{ document.getElementById('bbm_comment_input').value=''; loadBoardComments(bidId);});
+                };
+            });
+        }
+    </script>
+
+    <!-- Transfer Project Modal -->
+    <div id="transferModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Transfer Project</h3>
+                <p class="text-sm text-gray-600 mb-4">Transfer project: <span id="transferBidName" class="font-semibold"></span></p>
+                
+                <form id="transferForm" onsubmit="event.preventDefault(); submitTransfer();">
+                    <input type="hidden" id="transferBidId" name="g_id">
+                    
+                    <div class="mb-4">
+                        <label for="to_team" class="block text-sm font-medium text-gray-700 mb-2">Transfer to Team:</label>
+                        <select name="to_team" id="to_team" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            <option value="">Select Team</option>
+                            <option value="business">Business Development</option>
+                            <option value="design">Design Team</option>
+                            <option value="operations">Operations Team</option>
+                            <option value="engineer">Site Engineer</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="transfer_reason" class="block text-sm font-medium text-gray-700 mb-2">Transfer Reason:</label>
+                        <textarea name="transfer_reason" id="transfer_reason" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Reason for transfer..."></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeTransferModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
+                            Transfer Project
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

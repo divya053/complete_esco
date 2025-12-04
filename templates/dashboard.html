@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">My Bids Dashboard</h1>
+        <div>
+            <span class="text-gray-600 mr-4">Welcome, {{ user.email }}</span>
+            <a href="{{ url_for('logout') }}" class="text-red-500 hover:underline">Logout</a>
+        </div>
+    </div>
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold mb-4">Your Active Bids</h2>
+        <table class="w-full text-left">
+            <thead>
+                <tr class="border-b">
+                    <th class="p-2">Bid Name</th>
+                    <th class="p-2">Current Stage</th>
+                    <th class="p-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bid in bids %}
+                <tr id="bid-row-{{ bid.id }}">
+                    <td class="p-2">{{ bid.name }}</td>
+                    <td class="p-2 stage-text">{{ bid.current_stage | title }}</td>
+                    <td class="p-2">
+                        <select onchange="updateBidStage({{ bid.id }}, this.value)" class="border rounded p-1">
+                            <option value="analyzer" {% if bid.current_stage == 'analyzer' %}selected{% endif %}>Analyzer</option>
+                            <option value="business" {% if bid.current_stage == 'business' %}selected{% endif %}>Business</option>
+                            <option value="design" {% if bid.current_stage == 'design' %}selected{% endif %}>Design</option>
+                            <option value="operations" {% if bid.current_stage == 'operations' %}selected{% endif %}>Operations</option>
+                        </select>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function updateBidStage(bidId, newStage) {
+            const response = await fetch(`/api/update_stage/${bidId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stage: newStage })
+            });
+            const result = await response.json();
+            if (result.success) {
+                const stageText = document.querySelector(`#bid-row-${bidId} .stage-text`);
+                stageText.textContent = newStage.charAt(0).toUpperCase() + newStage.slice(1);
+            } else {
+                console.error('Update failed:', result.error);
+            }
+        }
+    </script>
+</body>
+</html>

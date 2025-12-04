@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ role }} Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="flex h-screen">
+        {% include 'sidebar.html' %}
+
+        <main class="flex-1 p-8 overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">{{ role }} Dashboard</h2>
+                {% if current_stage %}
+                <div class="text-sm text-gray-600">Current Stage: <span class="font-semibold">{{ current_stage|replace('_',' ')|capitalize }}</span></div>
+                {% endif %}
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold mb-4">Assigned Bids</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="p-3">ID</th>
+                                <th class="p-3">Bid Name</th>
+                                <th class="p-3">Current Stage</th>
+                                <th class="p-3">Next</th>
+                                <th class="p-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bid in bids %}
+                            <tr class="border-b">
+                                <td class="p-3">{{ bid.id }}</td>
+                                <td class="p-3">{{ bid.name }}</td>
+                                <td class="p-3">{{ bid.current_stage|replace('_',' ')|capitalize }}</td>
+                                <td class="p-3">{{ bid.next_stage and bid.next_stage|replace('_',' ')|capitalize or '-' }}</td>
+                                <td class="p-3">
+                                    {% if bid.next_stage %}
+                                    <button class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded" onclick="advanceStage({{ bid.id }}, '{{ bid.next_stage }}')">
+                                        Advance to {{ bid.next_stage|replace('_',' ')|capitalize }}
+                                    </button>
+                                    {% else %}
+                                    <span class="text-gray-500">No further stage</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if bids|length == 0 %}
+                            <tr>
+                                <td colspan="5" class="p-6 text-center text-gray-500">No bids to show</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function advanceStage(bidId, nextStage) {
+            fetch(`/api/update_stage/${bidId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stage: nextStage })
+            }).then(r => r.json()).then(() => {
+                window.location.reload();
+            });
+        }
+    </script>
+</body>
+</html>
+
+

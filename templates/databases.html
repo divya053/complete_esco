@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Management - ESCO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="flex">
+        {% include 'sidebar.html' %}
+
+        <main class="flex-1 p-8 overflow-y-auto">
+            <!-- Header -->
+            <header class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Database Management</h1>
+                        <p class="text-gray-600 mt-2">Manage company databases, projects, and revenue data</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative mr-4"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="text" placeholder="Search..." class="bg-white border border-gray-300 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                        <button class="mr-4 p-2 rounded-full hover:bg-gray-200"><i class="fas fa-bell"></i></button>
+                        <div class="flex items-center"><img src="https://placehold.co/40x40/4338ca/ffffff?text=U" alt="User Avatar" class="rounded-full w-10 h-10"></div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-6">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'error' if category == 'error' else 'success' }} bg-{{ 'red' if category == 'error' else 'green' }}-100 border border-{{ 'red' if category == 'error' else 'green' }}-400 text-{{ 'red' if category == 'error' else 'green' }}-700 px-4 py-3 rounded mb-2">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Action Buttons -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div class="flex flex-wrap gap-4">
+                    <!-- Excel Import -->
+                    <form action="{{ url_for('import_excel') }}" method="post" enctype="multipart/form-data" class="flex items-center space-x-2">
+                        <input type="file" name="excel_file" accept=".xlsx" class="hidden" id="excel-file-input" onchange="this.form.submit()">
+                        <button type="button" onclick="document.getElementById('excel-file-input').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                            <i class="fas fa-file-excel"></i>
+                            <span>Import from Excel</span>
+                        </button>
+                    </form>
+
+                    <!-- Drop All -->
+                    <button onclick="confirmDropAll()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                        <i class="fas fa-trash"></i>
+                        <span>Drop All Databases</span>
+                    </button>
+
+                    <!-- Download Template -->
+                    <button onclick="downloadTemplate()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                        <i class="fas fa-download"></i>
+                        <span>Download Excel Template</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Company Sections -->
+            {% for company_name, data in company_data.items() %}
+            <div class="bg-white rounded-lg shadow-md mb-8">
+                <!-- Company Header -->
+                <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">{{ company_name }}</h2>
+                            <p class="text-gray-600">{{ data.projects|length }} Projects • Total Revenue: ${{ "{:,.2f}".format(data.total_revenue) }}</p>
+                        </div>
+                        <button onclick="openCreateModal('{{ company_name }}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                            <i class="fas fa-plus"></i>
+                            <span>Add Project</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Projects Table -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for project in data.projects %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">{{ project.name }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">{{ project.due_date.strftime('%B %d, %Y') if project.due_date else 'N/A' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">${{ "{:,.2f}".format(project.revenue or 0) }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                        {% if project.status == 'active' %}bg-green-100 text-green-800
+                                        {% elif project.status == 'completed' %}bg-blue-100 text-blue-800
+                                        {% elif project.status == 'on_hold' %}bg-yellow-100 text-yellow-800
+                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                        {{ project.status|title }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                            <div class="bg-blue-600 h-2 rounded-full" style="width: {{ project.progress }}%"></div>
+                                        </div>
+                                        <span class="text-sm text-gray-900">{{ project.progress }}%</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button onclick="openEditModal({{ project.id }}, '{{ project.name }}', '{{ project.due_date }}', {{ project.revenue or 0 }}, '{{ project.status }}', {{ project.progress }})" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button onclick="confirmDelete({{ project.id }}, '{{ project.name }}')" class="text-red-600 hover:text-red-900">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                    No projects found for {{ company_name }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Create Project Modal -->
+            <div id="createModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+                <div class="flex items-center justify-center min-h-screen p-4">
+                    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                        <div class="p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Create New Project</h3>
+                            <form id="createForm" action="{{ url_for('create_project') }}" method="post">
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Company</label>
+                                        <select name="company_name" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                                            <option value="Ikio">Ikio</option>
+                                            <option value="Metco">Metco</option>
+                                            <option value="Sunsprint">Sunsprint</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Project Name</label>
+                                        <input type="text" name="project_name" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Due Date</label>
+                                        <input type="date" name="due_date" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Revenue ($)</label>
+                                        <input type="number" name="revenue" step="0.01" min="0" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Status</label>
+                                        <select name="status" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                            <option value="active">Active</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="on_hold">On Hold</option>
+                                            <option value="cancelled">Cancelled</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Progress (%)</label>
+                                        <input type="range" name="progress" min="0" max="100" value="0" class="mt-1 block w-full" oninput="this.nextElementSibling.textContent = this.value + '%'">
+                                        <div class="text-sm text-gray-600">0%</div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end space-x-3 mt-6">
+                                    <button type="button" onclick="closeCreateModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Create Project</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Project Modal -->
+            <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+                <div class="flex items-center justify-center min-h-screen p-4">
+                    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                        <div class="p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Edit Project</h3>
+                            <form id="editForm" action="" method="post">
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Project Name</label>
+                                        <input type="text" name="project_name" id="edit_project_name" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Due Date</label>
+                                        <input type="date" name="due_date" id="edit_due_date" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Revenue ($)</label>
+                                        <input type="number" name="revenue" id="edit_revenue" step="0.01" min="0" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Status</label>
+                                        <select name="status" id="edit_status" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                            <option value="active">Active</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="on_hold">On Hold</option>
+                                            <option value="cancelled">Cancelled</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Progress (%)</label>
+                                        <input type="range" name="progress" id="edit_progress" min="0" max="100" class="mt-1 block w-full" oninput="this.nextElementSibling.textContent = this.value + '%'">
+                                        <div class="text-sm text-gray-600" id="edit_progress_display">0%</div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end space-x-3 mt-6">
+                                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
+                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Update Project</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Modal functions
+        function openCreateModal(companyName) {
+            document.getElementById('createModal').classList.remove('hidden');
+            document.querySelector('select[name="company_name"]').value = companyName;
+        }
+
+        function closeCreateModal() {
+            document.getElementById('createModal').classList.add('hidden');
+            document.getElementById('createForm').reset();
+        }
+
+        function openEditModal(id, name, dueDate, revenue, status, progress) {
+            document.getElementById('editModal').classList.remove('hidden');
+            document.getElementById('editForm').action = `/databases/update_project/${id}`;
+            document.getElementById('edit_project_name').value = name;
+            document.getElementById('edit_due_date').value = dueDate;
+            document.getElementById('edit_revenue').value = revenue;
+            document.getElementById('edit_status').value = status;
+            document.getElementById('edit_progress').value = progress;
+            document.getElementById('edit_progress_display').textContent = progress + '%';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        function confirmDelete(id, name) {
+            if (confirm(`Are you sure you want to delete project "${name}"?`)) {
+                window.location.href = `/databases/delete_project/${id}`;
+            }
+        }
+
+        function confirmDropAll() {
+            if (confirm('Are you sure you want to delete ALL databases? This action cannot be undone!')) {
+                window.location.href = '/databases/drop_all';
+            }
+        }
+
+        function downloadTemplate() {
+            // Create a simple CSV template
+            const csvContent = "Company,Project Name,Due Date,Revenue,Status,Progress\nIkio,Sample Project 1,2024-12-31,50000,active,25\nMetco,Sample Project 2,2024-11-15,75000,active,50\nSunsprint,Sample Project 3,2024-10-30,100000,completed,100";
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'project_template.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const createModal = document.getElementById('createModal');
+            const editModal = document.getElementById('editModal');
+            if (event.target === createModal) {
+                closeCreateModal();
+            }
+            if (event.target === editModal) {
+                closeEditModal();
+            }
+        }
+    </script>
+</body>
+</html>

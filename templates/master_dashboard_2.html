@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESCO Master Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* CSS for interactive timeline and blinking dot */
+        .timeline-checkpoint {
+            transition: transform 0.2s ease-in-out;
+            z-index: 10;
+        }
+        .timeline-checkpoint:hover {
+            transform: scale(1.1);
+        }
+        .pulse-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            background-color: #22c55e; /* green-500 */
+            border-radius: 50%;
+            animation: pulse-animation 1.5s infinite cubic-bezier(0.455, 0.03, 0.515, 0.955);
+        }
+        @keyframes pulse-animation {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.75;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(4);
+                opacity: 0;
+            }
+        }
+        #summary-arrow {
+            transition: transform 0.3s ease-in-out;
+        }
+         #summary-arrow.rotate-180 {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+    <div class="flex h-screen">
+        
+        <aside class="w-64 bg-white p-6 flex flex-col justify-between border-r border-gray-200">
+            <div>
+                <div class="flex items-center mb-10">
+                    <i class="fas fa-bolt text-3xl text-blue-600 mr-3"></i>
+                    <h1 class="text-2xl font-bold text-gray-900">ESCO</h1>
+                </div>
+                <nav>
+                    <ul>
+                        <li class="mb-4"><a href="{{ url_for('master_dashboard') }}" class="flex items-center p-3 rounded-lg bg-blue-100 text-blue-600 font-semibold"><i class="fas fa-tachometer-alt mr-3"></i>Master Dashboard</a></li>
+                        <li class="mb-4"><a href="#" class="flex items-center p-3 rounded-lg hover:bg-gray-100"><i class="fas fa-lightbulb mr-3"></i>Intelligence Suite</a></li>
+                        <li class="mb-4"><a href="#" class="flex items-center p-3 rounded-lg hover:bg-gray-100"><i class="fas fa-building mr-3"></i>Companies</a></li>
+                        <li class="mb-4"><a href="#" class="flex items-center p-3 rounded-lg hover:bg-gray-100"><i class="fas fa-chart-pie mr-3"></i>BID Analyzer</a></li>
+                        <li class="mb-4"><a href="#" class="flex items-center p-3 rounded-lg hover:bg-gray-100"><i class="fas fa-database mr-3"></i>Database</a></li>
+                        <li class="mb-4"><a href="#" class="flex items-center p-3 rounded-lg hover:bg-gray-100"><i class="fas fa-history mr-3"></i>Logs</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div>
+                 <a href="{{ url_for('logout') }}" class="flex items-center p-3 hover:bg-gray-100 rounded-lg transition-all"><i class="fas fa-sign-out-alt mr-3"></i>Logout</a>
+            </div>
+        </aside>
+
+        <main class="flex-1 p-8 overflow-y-auto">
+            <header class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">ESCO Intelligence Suite</h2>
+                <div class="flex items-center">
+                    <div class="relative mr-4">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" placeholder="Search..." class="bg-white border border-gray-300 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button class="mr-4 p-2 rounded-full hover:bg-gray-200"><i class="fas fa-bell"></i></button>
+                    <div class="flex items-center">
+                         <img src="https://placehold.co/40x40/4338ca/ffffff?text=U" alt="User Avatar" class="rounded-full w-10 h-10">
+                    </div>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                 <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div><p class="text-gray-500 text-sm">Total Bid Count</p><p class="text-3xl font-bold text-gray-900">{{ data.total_bids }}</p></div><i class="fas fa-file-alt text-4xl text-blue-500"></i>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div><p class="text-gray-500 text-sm">Live Bid Count</p><p class="text-3xl font-bold text-gray-900">{{ data.live_bids }}</p></div><i class="fas fa-broadcast-tower text-4xl text-red-500"></i>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div><p class="text-gray-500 text-sm">Bid Won Count</p><p class="text-3xl font-bold text-gray-900">{{ data.bids_won }}</p></div><i class="fas fa-trophy text-4xl text-green-500"></i>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div><p class="text-gray-500 text-sm">Project Completed</p><p class="text-3xl font-bold text-gray-900">{{ data.projects_completed }}</p></div><i class="fas fa-check-circle text-4xl text-yellow-500"></i>
+                </div>
+            </div>
+            
+            <div class="bg-white p-8 rounded-lg shadow-md mb-8">
+                <div class="flex justify-between items-center mb-12">
+                    <h3 class="text-xl font-semibold text-gray-900">Timeline Tracker</h3>
+                    <button id="summary-toggle" class="flex items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
+                        <span>Dropdown for Summary</span>
+                        <i id="summary-arrow" class="fas fa-chevron-down ml-2"></i>
+                    </button>
+                </div>
+                <div class="relative w-full">
+                    <div class="absolute top-4 left-0 w-full h-1 bg-gray-200"></div>
+                    <div id="progress-line" class="absolute top-4 left-0 h-1 bg-green-500" style="width: 0; transition: width 0.5s ease-in-out; z-index: 1;"></div>
+                    <div id="blinking-dot" class="absolute top-4 left-0 h-8 w-8 -translate-x-1/2 -translate-y-1/2" style="transition: left 0.5s ease-in-out; z-index: 20;">
+                        <div class="relative w-full h-full flex items-center justify-center">
+                            <div class="pulse-ring"></div>
+                            <div class="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
+                        </div>
+                    </div>
+                    <div class="relative flex justify-between">
+                        <div class="timeline-checkpoint text-center cursor-pointer" data-stage="analyzer" data-title="BID Analyzer Summary">
+                            <div class="checkpoint-circle w-8 h-8 bg-gray-300 border-4 border-white rounded-full mx-auto"></div>
+                            <p class="mt-2 font-semibold">BID Analyzer</p><p class="text-xs text-gray-500">APP</p>
+                            <div class="mt-2"><span class="inline-block bg-blue-100 text-blue-600 text-xs font-semibold px-2 py-1 rounded-full">25 Bids</span></div>
+                        </div>
+                        <div class="timeline-checkpoint text-center cursor-pointer" data-stage="business" data-title="Business Development Summary">
+                            <div class="checkpoint-circle w-8 h-8 bg-gray-300 border-4 border-white rounded-full mx-auto"></div>
+                            <p class="mt-2 font-semibold">Business Development</p><p class="text-xs text-gray-500">Team</p>
+                             <div class="mt-2"><span class="inline-block bg-gray-200 text-gray-600 text-xs font-semibold px-2 py-1 rounded-full">15 Bids</span></div>
+                        </div>
+                        <div class="timeline-checkpoint text-center cursor-pointer" data-stage="design" data-title="Design Team Summary">
+                            <div class="checkpoint-circle w-8 h-8 bg-gray-300 border-4 border-white rounded-full mx-auto"></div>
+                            <p class="mt-2 font-semibold">Design & Marketing</p><p class="text-xs text-gray-500">Team</p>
+                            <div class="mt-2"><span class="inline-block bg-gray-200 text-gray-600 text-xs font-semibold px-2 py-1 rounded-full">12 Bids</span></div>
+                        </div>
+                        <div class="timeline-checkpoint text-center cursor-pointer" data-stage="operations" data-title="Operations Summary">
+                            <div class="checkpoint-circle w-8 h-8 bg-gray-300 border-4 border-white rounded-full mx-auto"></div>
+                            <p class="mt-2 font-semibold">Operation Team</p><p class="text-xs text-gray-500">Team</p>
+                            <div class="mt-2"><span class="inline-block bg-gray-200 text-gray-600 text-xs font-semibold px-2 py-1 rounded-full">8 Projects</span></div>
+                        </div>
+                        <div class="timeline-checkpoint text-center cursor-pointer" data-stage="engineer" data-title="Site Engineer Summary">
+                            <div class="checkpoint-circle w-8 h-8 bg-gray-300 border-4 border-white rounded-full mx-auto"></div>
+                            <p class="mt-2 font-semibold">Engineering Team</p><p class="text-xs text-gray-500">Role</p>
+                            <div class="mt-2"><span class="inline-block bg-gray-200 text-gray-600 text-xs font-semibold px-2 py-1 rounded-full">5 Projects</span></div>
+                        </div>
+                        <div class="timeline-checkpoint text-center cursor-pointer" data-stage="handover" data-title="Submitted / Closure Summary">
+                            <div class="checkpoint-circle w-8 h-8 bg-gray-300 border-4 border-white rounded-full mx-auto"></div>
+                            <p class="mt-2 font-semibold">Submitted</p><p class="text-xs text-gray-500">Closure</p>
+                            <div class="mt-2"><span class="inline-block bg-gray-200 text-gray-600 text-xs font-semibold px-2 py-1 rounded-full">3 Projects</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="timeline-summary" class="hidden mt-12 p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 id="summary-title" class="text-lg font-semibold text-blue-600 mb-4"></h4>
+                    <div id="summary-content"></div>
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <h3 class="text-xl font-semibold text-gray-900 mb-4">BID Analyzer</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-5 rounded-lg shadow-md flex flex-col items-center justify-center text-center">
+                        <p class="text-base text-gray-500">Total Bids Incoming</p>
+                        <p class="text-4xl font-bold text-gray-900 mt-2">150</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg shadow-md flex flex-col items-center justify-center text-center">
+                        <p class="text-base text-gray-500">Count of Bids GO</p>
+                        <p class="text-4xl font-bold text-green-600 mt-2">95</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg shadow-md flex flex-col items-center justify-center text-center">
+                        <p class="text-base text-gray-500">Count of Bids Submitted</p>
+                        <p class="text-4xl font-bold text-blue-600 mt-2">110</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg shadow-md flex flex-col items-center justify-center text-center">
+                        <p class="text-base text-gray-500">Total Count of Bids Won</p>
+                        <p class="text-4xl font-bold text-green-600 mt-2">75</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                 <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-900">All Bids Status</h2>
+                    <div class="overflow-y-auto max-h-96">
+                        <table class="w-full text-left">
+                            <thead class="sticky top-0 bg-white"><tr class="border-b"><th class="p-2">Bid Name</th><th class="p-2">Assigned User</th><th class="p-2">Current Stage</th></tr></thead>
+                            <tbody id="bids-table-body">
+                                {% for bid in bids %}
+                                <tr id="master-bid-{{ bid.id }}" class="border-b border-gray-200">
+                                    <td class="p-2">{{ bid.name }}</td><td class="p-2 text-gray-600">{{ bid.user.email }}</td><td class="p-2 font-medium stage-text">{{ bid.current_stage | title }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-900">Live Activity Log</h2>
+                    <div class="overflow-y-auto max-h-96">
+                        <table class="w-full text-left">
+                            <thead class="sticky top-0 bg-white"><tr class="border-b"><th class="p-2 w-1/3">Timestamp</th><th class="p-2">Action</th></tr></thead>
+                            <tbody id="logs-table-body">
+                                {% for log in logs %}
+                                <tr class="border-b border-gray-200">
+                                    <td class="p-2 text-gray-500 text-sm">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td><td class="p-2 text-sm">{{ log.action }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- Socket.IO for live table updates ---
+            const socket = io();
+            socket.on('master_update', function(data) {
+                // Update Bids Table
+                const bidsTableBody = document.getElementById('bids-table-body');
+                const existingBidRow = document.getElementById(`master-bid-${data.bid.id}`);
+                if (existingBidRow) {
+                    existingBidRow.querySelector('.stage-text').textContent = data.bid.current_stage.charAt(0).toUpperCase() + data.bid.current_stage.slice(1);
+                }
+
+                // Update Logs Table
+                const logsTableBody = document.getElementById('logs-table-body');
+                const newLogRow = document.createElement('tr');
+                newLogRow.classList.add('border-b', 'border-gray-200');
+                newLogRow.innerHTML = `
+                    <td class="p-2 text-gray-500 text-sm">${data.log.timestamp}</td>
+                    <td class="p-2 text-sm">${data.log.action}</td>
+                `;
+                logsTableBody.prepend(newLogRow);
+            });
+
+            // --- Interactive Timeline JavaScript ---
+            const checkpoints = document.querySelectorAll('.timeline-checkpoint');
+            const summaryTitle = document.getElementById('summary-title');
+            const summaryContent = document.getElementById('summary-content');
+            const blinkingDot = document.getElementById('blinking-dot');
+            const progressLine = document.getElementById('progress-line');
+            const summaryToggle = document.getElementById('summary-toggle');
+            const timelineSummary = document.getElementById('timeline-summary');
+            const summaryArrow = document.getElementById('summary-arrow');
+
+            const summaryData = {
+                analyzer: ["Review of tender documents and project scope.", "Conduct initial viability and profitability assessment.", "Plan for necessary resource allocation."],
+                business: ["Making of Proposals", "Creation of Helioscope Reports", "Track and nurture incoming leads", "Maintain regular client follow-ups and communication"],
+                design: ["Preparation of detailed technical drawings", "Creation of Single-Line Diagrams (SLD)", "Finalization of the Bill of Quantities (BOQ)"],
+                operations: ["Conduct project kick-off meetings with stakeholders", "Manage procurement of materials and equipment", "Coordinate and manage vendors and subcontractors", "Develop and maintain the project execution schedule"],
+                engineer: ["Provide on-site supervision of all activities", "Implement and monitor quality control checks", "Manage the installation process from start to finish", "Compile and submit daily progress reports"],
+                Submitted: ["Compile and deliver all final project documentation", "Provide client training and a final project walkthrough", "Finalize warranty and ongoing service agreements", "Complete the official project closure process"]
+            };
+            
+            function moveDot(checkpoint) {
+                const newLeft = checkpoint.offsetLeft + (checkpoint.offsetWidth / 2);
+                blinkingDot.style.left = `${newLeft}px`;
+                progressLine.style.width = `${newLeft}px`;
+            }
+
+            function updateSummary(stage, title, checkpoint) {
+                moveDot(checkpoint);
+                summaryTitle.textContent = title;
+                const tasks = summaryData[stage] || [];
+                summaryContent.innerHTML = `<ol class="list-decimal list-inside text-gray-600 space-y-2">${tasks.map(task => `<li>${task}</li>`).join('')}</ol>`;
+                
+                const activeIndex = Array.from(checkpoints).indexOf(checkpoint);
+                checkpoints.forEach((cp, index) => {
+                    const circle = cp.querySelector('.checkpoint-circle');
+                    const badge = cp.querySelector('span');
+
+                    circle.classList.remove('bg-green-500', 'bg-gray-300');
+                    circle.classList.add(index <= activeIndex ? 'bg-green-500' : 'bg-gray-300');
+                    
+                    if (badge) {
+                        badge.classList.remove('bg-blue-100', 'text-blue-600', 'bg-gray-200', 'text-gray-600');
+                        if (index === activeIndex) {
+                             badge.classList.add('bg-blue-100', 'text-blue-600');
+                        } else {
+                             badge.classList.add('bg-gray-200', 'text-gray-600');
+                        }
+                    }
+                });
+            }
+
+            checkpoints.forEach(checkpoint => {
+                checkpoint.addEventListener('click', () => {
+                    updateSummary(checkpoint.dataset.stage, checkpoint.dataset.title, checkpoint);
+                });
+            });
+
+            summaryToggle.addEventListener('click', () => {
+                timelineSummary.classList.toggle('hidden');
+                summaryArrow.classList.toggle('rotate-180');
+            });
+
+            const firstCheckpoint = checkpoints[0];
+            setTimeout(() => {
+                if (firstCheckpoint) {
+                    updateSummary(firstCheckpoint.dataset.stage, firstCheckpoint.dataset.title, firstCheckpoint);
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>

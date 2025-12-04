@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFP Analyzer - ESCO Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        {% include 'sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="flex-1 p-8 overflow-y-auto">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">RFP Analyzer</h2>
+                <p class="text-gray-600">AI-powered bid compliance evaluation using Ollama</p>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-900 mb-4">Upload Documents</h3>
+                
+                <form id="rfpAnalyzerForm" enctype="multipart/form-data">
+                    <!-- RFP Upload -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-file-pdf text-red-500 mr-2"></i>RFP Document (Required)
+                        </label>
+                        <input type="file" name="rfp_file" id="rfp_file" accept=".pdf,.txt,.docx" required
+                               class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
+                        <p class="mt-1 text-sm text-gray-500">Upload PDF, TXT, or DOCX file</p>
+                    </div>
+
+                    <!-- Company Contexts -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-building text-blue-500 mr-2"></i>IKIO Context
+                            </label>
+                            <input type="file" name="ikio_context" id="ikio_context" accept=".txt,.docx,.xlsx"
+                                   class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-building text-green-500 mr-2"></i>METCO Context
+                            </label>
+                            <input type="file" name="metco_context" id="metco_context" accept=".txt,.docx,.xlsx"
+                                   class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-building text-yellow-500 mr-2"></i>SUNSPRINT Context
+                            </label>
+                            <input type="file" name="sunsprint_context" id="sunsprint_context" accept=".txt,.docx,.xlsx"
+                                   class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50">
+                        </div>
+                    </div>
+
+                    <!-- Analyze Button -->
+                    <button type="submit" id="analyzeBtn"
+                            class="w-full gradient-bg text-white font-semibold py-3 px-6 rounded-lg hover:opacity-90 transition duration-200">
+                        <i class="fas fa-chart-line mr-2"></i>Analyze RFP
+                    </button>
+                </form>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loadingSection" class="hidden bg-white rounded-lg shadow-md p-8 mb-6 text-center">
+                <div class="loading-spinner mx-auto mb-4"></div>
+                <p class="text-gray-600 font-medium">Analyzing RFP with Ollama AI...</p>
+                <p class="text-gray-500 text-sm mt-2">This may take a few minutes</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="hidden">
+                <!-- RFP Summary -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-file-alt text-blue-500 mr-2"></i>RFP Summary
+                    </h3>
+                    <div id="rfpSummaryContent" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+
+                <!-- Winner Card -->
+                <div id="winnerCard" class="bg-gradient-to-r from-green-400 to-blue-500 rounded-lg shadow-lg p-6 mb-6 text-white">
+                    <h3 class="text-2xl font-bold mb-2">
+                        <i class="fas fa-trophy mr-2"></i>Recommended Company
+                    </h3>
+                    <div id="winnerContent">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+
+                <!-- Company Results -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div id="ikioResults" class="hidden bg-white rounded-lg shadow-md p-6"></div>
+                    <div id="metcoResults" class="hidden bg-white rounded-lg shadow-md p-6"></div>
+                    <div id="sunsprintResults" class="hidden bg-white rounded-lg shadow-md p-6"></div>
+                </div>
+
+                <!-- Detailed Compliance Table -->
+                <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-list-check text-purple-500 mr-2"></i>Detailed Compliance Assessment
+                    </h3>
+                    <div id="complianceTable">
+                        <!-- Dynamic table content -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.getElementById('rfpAnalyzerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Show loading, hide results
+            document.getElementById('loadingSection').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('analyzeBtn').disabled = true;
+            
+            // Prepare form data
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch('/rfp-analyzer/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        });
+        
+        function displayResults(data) {
+            // Show results section
+            document.getElementById('resultsSection').classList.remove('hidden');
+            
+            // Display RFP Summary
+            const summaryContent = document.getElementById('rfpSummaryContent');
+            summaryContent.innerHTML = `
+                <div><strong>Project Type:</strong> ${data.rfp_summary.project_type || 'N/A'}</div>
+                <div><strong>Due Date:</strong> ${data.rfp_summary.due_date || 'N/A'}</div>
+                <div><strong>Scope:</strong> ${(data.rfp_summary.scope || 'N/A').substring(0, 200)}...</div>
+                <div><strong>Estimated Cost:</strong> ${data.rfp_summary.total_cost || 'N/A'}</div>
+            `;
+            
+            // Display Winner
+            if (data.winner && data.winner.company) {
+                const winnerContent = document.getElementById('winnerContent');
+                winnerContent.innerHTML = `
+                    <div class="text-3xl font-bold mb-2">${data.winner.company}</div>
+                    <div class="text-xl">Compliance: ${data.winner.compliance}%</div>
+                    <div class="text-lg mt-2">Decision: ${data.winner.decision}</div>
+                `;
+            }
+            
+            // Display each company's results
+            for (const [company, result] of Object.entries(data.results)) {
+                const containerId = company.toLowerCase() + 'Results';
+                const container = document.getElementById(containerId);
+                if (container) {
+                    container.classList.remove('hidden');
+                    container.innerHTML = `
+                        <h4 class="text-lg font-semibold mb-4 text-${getCompanyColor(company)}-600">${company}</h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Total Score:</span>
+                                <span class="font-semibold">${result.totalScore}/${result.maxScore}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Compliance:</span>
+                                <span class="font-semibold">${result.compliance}%</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Decision:</span>
+                                <span class="px-3 py-1 rounded-full text-sm font-semibold ${getDecisionColor(result.decision)}">
+                                    ${result.decision}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Display detailed compliance table
+            const complianceTable = document.getElementById('complianceTable');
+            let tableHTML = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
+            tableHTML += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requirement</th>';
+            
+            for (const company of Object.keys(data.results)) {
+                tableHTML += `<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">${company}</th>`;
+            }
+            tableHTML += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+            
+            // Get max evaluation length
+            const maxLen = Math.max(...Object.values(data.results).map(r => r.evaluations.length));
+            
+            for (let i = 0; i < maxLen; i++) {
+                tableHTML += '<tr>';
+                const firstCompany = Object.keys(data.results)[0];
+                const req = data.results[firstCompany].evaluations[i]?.requirement || '';
+                tableHTML += `<td class="px-4 py-3 text-sm text-gray-900">${req.substring(0, 80)}...</td>`;
+                
+                for (const company of Object.keys(data.results)) {
+                    const eval = data.results[company].evaluations[i];
+                    if (eval) {
+                        const evalClass = eval.evaluation === 'Yes' ? 'text-green-600' : eval.evaluation === 'No' ? 'text-red-600' : 'text-yellow-600';
+                        tableHTML += `<td class="px-4 py-3 text-sm text-center ${evalClass} font-semibold">${eval.evaluation} (${eval.score})</td>`;
+                    } else {
+                        tableHTML += '<td class="px-4 py-3 text-sm text-center">-</td>';
+                    }
+                }
+                tableHTML += '</tr>';
+            }
+            
+            tableHTML += '</tbody></table></div>';
+            complianceTable.innerHTML = tableHTML;
+        }
+        
+        function getCompanyColor(company) {
+            const colors = {'IKIO': 'blue', 'METCO': 'green', 'SUNSPRINT': 'yellow'};
+            return colors[company] || 'gray';
+        }
+        
+        function getDecisionColor(decision) {
+            if (decision.includes('Go') && !decision.includes('No')) return 'bg-green-100 text-green-800';
+            if (decision.includes('No-Go')) return 'bg-red-100 text-red-800';
+            return 'bg-yellow-100 text-yellow-800';
+        }
+    </script>
+</body>
+</html>
+
